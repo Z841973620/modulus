@@ -1,0 +1,3 @@
+[submodule "gequel"]
+	path = gequel
+	url = ../gequel.git

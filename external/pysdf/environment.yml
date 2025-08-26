@@ -1,0 +1,10 @@
+name: sdf_dev
+channels:
+  - defaults
+dependencies:
+  - python=3.7
+  - numpy
+  - cython
+  - pip
+  - pip:
+    - python-language-server

@@ -1,0 +1,8 @@
+build
+compile_commands.json
+*.so
+*.pyc
+pysdf/*.c
+test/*.ptx
+*.egg-info
+build*
