@@ -28,6 +28,12 @@ class AggregatorGradNormConf(LossConf):
 
 
 @dataclass
+class AggregatorResNormConf(LossConf):
+    _target_: str = "modulus.loss.aggregator.ResNorm"
+    alpha: float = 1.0
+
+
+@dataclass
 class AggregatorHomoscedasticConf(LossConf):
     _target_: str = "modulus.loss.aggregator.HomoscedasticUncertainty"
 
@@ -74,6 +80,11 @@ def register_loss_configs() -> None:
         group="loss",
         name="grad_norm",
         node=AggregatorGradNormConf,
+    )
+    cs.store(
+        group="loss",
+        name="res_norm",
+        node=AggregatorResNormConf,
     )
     cs.store(
         group="loss",

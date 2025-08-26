@@ -30,6 +30,8 @@ class Diffusion(PDE):
         Default is 3.
     time : bool
         If time-dependent equations or not. Default is True.
+    mixed_form: bool
+        If True, use the mixed formulation of the diffusion equations.
 
     Examples
     ========
@@ -43,11 +45,12 @@ class Diffusion(PDE):
 
     name = "Diffusion"
 
-    def __init__(self, T="T", D="D", Q=0, dim=3, time=True):
+    def __init__(self, T="T", D="D", Q=0, dim=3, time=True, mixed_form=False):
         # set params
         self.T = T
         self.dim = dim
         self.time = time
+        self.mixed_form = mixed_form
 
         # coordinates
         x, y, z = Symbol("x"), Symbol("y"), Symbol("z")
@@ -83,13 +86,40 @@ class Diffusion(PDE):
 
         # set equations
         self.equations = {}
-        self.equations["diffusion_" + self.T] = (
-            T.diff(t)
-            - (D * T.diff(x)).diff(x)
-            - (D * T.diff(y)).diff(y)
-            - (D * T.diff(z)).diff(z)
-            - Q
-        )
+
+        if not self.mixed_form:
+            self.equations["diffusion_" + self.T] = (
+                T.diff(t)
+                - (D * T.diff(x)).diff(x)
+                - (D * T.diff(y)).diff(y)
+                - (D * T.diff(z)).diff(z)
+                - Q
+            )
+        elif self.mixed_form:
+            T_x = Function("T_x")(*input_variables)
+            T_y = Function("T_y")(*input_variables)
+            if self.dim == 3:
+                T_z = Function("T_z")(*input_variables)
+            else:
+                T_z = Number(0)
+
+            self.equations["diffusion_" + self.T] = (
+                T.diff(t)
+                - (D * T_x).diff(x)
+                - (D * T_y).diff(y)
+                - (D * T_z).diff(z)
+                - Q
+            )
+            self.equations["compatibility_T_x"] = T.diff(x) - T_x
+            self.equations["compatibility_T_y"] = T.diff(y) - T_y
+            self.equations["compatibility_T_z"] = T.diff(z) - T_z
+            self.equations["compatibility_T_xy"] = T_x.diff(y) - T_y.diff(x)
+            self.equations["compatibility_T_xz"] = T_x.diff(z) - T_z.diff(x)
+            self.equations["compatibility_T_yz"] = T_y.diff(z) - T_z.diff(y)
+            if self.dim == 2:
+                self.equations.pop("compatibility_T_z")
+                self.equations.pop("compatibility_T_xz")
+                self.equations.pop("compatibility_T_yz")
 
 
 class DiffusionInterface(PDE):

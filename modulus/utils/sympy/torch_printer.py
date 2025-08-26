@@ -2,7 +2,7 @@
 Helper functions for converting sympy equations to pytorch
 """
 
-from sympy import lambdify, Symbol, Derivative, Function, Basic, Max, Min
+from sympy import lambdify, Symbol, Derivative, Function, Basic, Add, Max, Min
 from sympy.printing.str import StrPrinter
 import torch
 import numpy as np
@@ -240,11 +240,29 @@ Basic.__str__ = lambda self: CustomDerivativePrinter().doprint(self)
 # Class to compile and evaluate a sympy expression in PyTorch
 # Cannot currently script this module because self.torch_expr is unknown
 class SympyToTorch(torch.nn.Module):
-    def __init__(self, sympy_expr, name: str, detach_names: List[str] = []):
+    def __init__(
+        self,
+        sympy_expr,
+        name: str,
+        freeze_terms: List[int] = [],
+        detach_names: List[str] = [],
+    ):
         super().__init__()
         # Sort keys to guarantee ordering
         self.keys = sorted([k.name for k in sympy_expr.free_symbols])
-        self.torch_expr = torch_lambdify(sympy_expr, self.keys)
+        self.freeze_terms = freeze_terms
+        if not self.freeze_terms:
+            self.torch_expr = torch_lambdify(sympy_expr, self.keys)
+        else:
+            assert all(
+                x < len(Add.make_args(sympy_expr)) for x in freeze_terms
+            ), "The freeze term index cannot be larger than the total terms in the expression"
+            self.torch_expr = []
+            for i in range(len(Add.make_args(sympy_expr))):
+                self.torch_expr.append(
+                    torch_lambdify(Add.make_args(sympy_expr)[i], self.keys)
+                )
+            self.freeze_list = list(self.torch_expr[i] for i in freeze_terms)
         self.name = name
         self.detach_names = detach_names
 
@@ -252,4 +270,14 @@ class SympyToTorch(torch.nn.Module):
         args = [
             var[k].detach() if k in self.detach_names else var[k] for k in self.keys
         ]
-        return {self.name: self.torch_expr(args)}
+        if not self.freeze_terms:
+            output = self.torch_expr(args)
+        else:
+            output = torch.zeros_like(var[self.keys[0]])
+            for i, expr in enumerate(self.torch_expr):
+                if expr in self.freeze_list:
+                    output += expr(args).detach()
+                else:
+                    output += expr(args)
+
+        return {self.name: output}

@@ -79,9 +79,9 @@ def test_maxwell_freq_real():
 
     k = 0.1
 
-    Maxwell_Freq_real_x_true = curlcurlux - k ** 2 * ux
-    Maxwell_Freq_real_y_true = curlcurluy - k ** 2 * uy
-    Maxwell_Freq_real_z_true = curlcurluz - k ** 2 * uz
+    Maxwell_Freq_real_x_true = curlcurlux - k**2 * ux
+    Maxwell_Freq_real_y_true = curlcurluy - k**2 * uy
+    Maxwell_Freq_real_z_true = curlcurluz - k**2 * uz
 
     maxwell_eq = MaxwellFreqReal(k=k)
     evaluations_MaxwellFreqReal_x = maxwell_eq.make_nodes()[0].evaluate(

@@ -473,15 +473,15 @@ class RBF_Function:
         if self.dim == 1:
             self.r_sympy = sp.Abs(x)
         elif self.dim == 2:
-            self.r_sympy = sp.sqrt(x ** 2 + y ** 2)
+            self.r_sympy = sp.sqrt(x**2 + y**2)
         else:
-            self.r_sympy = sp.sqrt(x ** 2 + y ** 2 + z ** 2)
+            self.r_sympy = sp.sqrt(x**2 + y**2 + z**2)
         if self.RBF_name == "Inverse quadratic":
-            self.RBF_prototype = 1 / (1 + self.r_sympy ** 2)
+            self.RBF_prototype = 1 / (1 + self.r_sympy**2)
         elif self.RBF_name == "Inverse multiquadric":
-            self.RBF_prototype = 1 / sp.sqrt(1 + self.r_sympy ** 2)
+            self.RBF_prototype = 1 / sp.sqrt(1 + self.r_sympy**2)
         else:
-            self.RBF_prototype = sp.exp(-self.r_sympy ** 2)
+            self.RBF_prototype = sp.exp(-self.r_sympy**2)
         self.initialize()
         self.make_fcn_list()
         self.lambdify_fcn_list()

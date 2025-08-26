@@ -44,7 +44,7 @@ class ADF(torch.nn.Module):
 
         omega_E = torch.zeros_like(omegas[0])
         for omega in omegas:
-            omega_E += 1.0 / omega ** m
+            omega_E += 1.0 / omega**m
         omega_E = 1.0 / omega_E ** (1.0 / m)
         return omega_E
 
@@ -134,8 +134,8 @@ class ADF(torch.nn.Module):
         center = ADF._center(point_1, point_2)
         f = ADF.infinite_line_adf(points, point_1, point_2)
         t = ADF.circle_adf(points, L / 2, center)
-        phi = torch.sqrt(t ** 2 + f ** 4)
-        omega = torch.sqrt(f ** 2 + ((phi - t) / 2) ** 2)
+        phi = torch.sqrt(t**2 + f**4)
+        omega = torch.sqrt(f**2 + ((phi - t) / 2) ** 2)
         return omega
 
     @staticmethod
@@ -161,7 +161,7 @@ class ADF(torch.nn.Module):
         """
 
         omega = (
-            radius ** 2 - ((points[0] - center[0]) ** 2 + (points[1] - center[1]) ** 2)
+            radius**2 - ((points[0] - center[0]) ** 2 + (points[1] - center[1]) ** 2)
         ) / (2 * radius)
         return omega
 
@@ -186,7 +186,7 @@ class ADF(torch.nn.Module):
         point_2: Tuple[float]
           One of the two points that form the trimming infinite line
         sign: int
-          Specifies the triming side
+          Specifies the trimming side
         radius: float
           Radius of the circle
         center: Tuple[float]
@@ -201,8 +201,8 @@ class ADF(torch.nn.Module):
         assert sign != 0, "sign should be non-negative"
         f = ADF.circle_adf(points, radius, center)
         t = np.sign(sign) * ADF.infinite_line_adf(points, point_1, point_2)
-        phi = torch.sqrt(t ** 2 + f ** 4)
-        omega = torch.sqrt(f ** 2 + ((phi - t) / 2) ** 2)
+        phi = torch.sqrt(t**2 + f**4)
+        omega = torch.sqrt(f**2 + ((phi - t) / 2) ** 2)
         return omega
 
     @staticmethod

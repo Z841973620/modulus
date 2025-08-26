@@ -65,6 +65,50 @@ class DistributedManager(object):
         return self._cuda
 
     @property
+    def group_names(self):
+        """
+        Returns a list of all named process groups created
+        """
+        return self._groups.keys()
+
+    def group(self, name=None):
+        """
+        Returns a process group with the given name
+        If name is None, group is also None indicating the default process group
+        If named group does not exist, returns None also
+        """
+        if name in self._groups.keys():
+            return self._groups[name]
+        else:
+            return None
+
+    def group_size(self, name=None):
+        """
+        Returns the size of named process group
+        """
+        if name is None:
+            return self._world_size
+        group = self.group(name)
+        return dist.get_world_size(group=group)
+
+    def group_rank(self, name=None):
+        """
+        Returns the rank in named process group
+        """
+        if name is None:
+            return self._rank
+        group = self.group(name)
+        return dist.get_rank(group=group)
+
+    def group_name(self, group=None):
+        """
+        Returns the name of process group
+        """
+        if group is None:
+            return None
+        return self._group_names[group]
+
+    @property
     def broadcast_buffers(self):
         return self._broadcast_buffers
 
@@ -217,6 +261,10 @@ class DistributedManager(object):
                 backend, rank=manager.rank, world_size=manager.world_size
             )
 
+        manager._groups = {}
+        manager._group_ranks = {}
+        manager._group_names = {}
+
         manager._device = torch.device(
             f"cuda:{manager.local_rank}" if torch.cuda.is_available() else "cpu"
         )
@@ -229,6 +277,81 @@ class DistributedManager(object):
         # Set device for this process and empty cache to optimize memory usage
         torch.cuda.device(manager.device)
         torch.cuda.empty_cache()
+
+    @staticmethod
+    def create_process_subgroup(name: str, size: int, group_name=None, verbose=False):
+
+        manager = DistributedManager()
+        if not manager.distributed:
+            return None
+
+        assert name not in manager._groups, f"Group with name {name} already exists"
+
+        # Get parent group's params
+        group = manager._group[group_name] if group_name else None
+        group_size = dist.get_world_size(group=group)
+        group_rank = dist.get_rank(group=group)
+        num_groups = manager.world_size // group_size
+
+        # Get number of sub-groups per parent group
+        assert (
+            group_size % size == 0
+        ), f"Cannot divide group size {group_size} evenly into subgroups of size {size}"
+        num_subgroups = group_size // size
+
+        # Create all the sub-groups
+        # Note: all ranks in the job need to create all sub-groups in
+        # the same order even if a rank is not part of a sub-group
+        manager._group_ranks[name] = []
+        for g in range(num_groups):
+            for i in range(num_subgroups):
+                # Get global ranks that are part of this sub-group
+                start = i * size
+                end = start + size
+                if group_name:
+                    ranks = manager._group_ranks[group_name][g][start:end]
+                else:
+                    ranks = list(range(start, end))
+                # Create sub-group and keep track of ranks
+                tmp_group = dist.new_group(ranks=ranks)
+                manager._group_ranks[name].append(ranks)
+                if manager.rank in ranks:
+                    # Set group in manager only if this rank is part of the group
+                    manager._groups[name] = tmp_group
+                    manager._group_names[tmp_group] = name
+
+        if verbose and manager.rank == 0:
+            print(f"Process group '{name}':")
+            for grp in manager._group_ranks[name]:
+                print("    ", grp)
+
+    @staticmethod
+    def create_orthogonal_process_group(name: str, group_name: str, verbose=False):
+        manager = DistributedManager()
+        if not manager.distributed:
+            return None
+
+        assert (
+            group_name in manager._groups
+        ), f"Group with name {group_name} does not exist"
+        assert name not in manager._groups, f"Group with name {name} already exists"
+
+        group_ranks = manager._group_ranks[group_name]
+        orthogonal_ranks = [list(i) for i in zip(*group_ranks)]
+
+        for ranks in orthogonal_ranks:
+            tmp_group = dist.new_group(ranks=ranks)
+            if manager.rank in ranks:
+                # Set group in manager only if this rank is part of the group
+                manager._groups[name] = tmp_group
+                manager._group_names[tmp_group] = name
+
+        manager._group_ranks[name] = orthogonal_ranks
+
+        if verbose and manager.rank == 0:
+            print(f"Process group '{name}':")
+            for grp in manager._group_ranks[name]:
+                print("    ", grp)
 
     @staticmethod
     def cleanup():

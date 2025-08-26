@@ -26,6 +26,7 @@ from contextlib import ExitStack
 from .domain.constraint import Constraint
 from .domain import Domain
 from .loss.aggregator import Sum
+from .utils.training.stop_criterion import StopCriterion
 from .constants import TF_SUMMARY, JIT_PYTORCH_VERSION
 from .hydra import (
     instantiate_optim,
@@ -184,6 +185,12 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
         self.print_stats_freq = self.cfg.training.print_stats_freq
         self.summary_freq = self.cfg.training.summary_freq
         self.amp = self.cfg.training.amp
+        self.stop_criterion_metric = self.cfg.stop_criterion.metric
+        self.stop_criterion_min_delta = self.cfg.stop_criterion.min_delta
+        self.stop_criterion_patience = self.cfg.stop_criterion.patience
+        self.stop_criterion_mode = self.cfg.stop_criterion.mode
+        self.stop_criterion_freq = self.cfg.stop_criterion.freq
+        self.stop_criterion_strict = self.cfg.stop_criterion.strict
 
         self.save_filetypes = self.cfg.save_filetypes
         self.summary_histograms = self.cfg.summary_histograms
@@ -260,7 +267,10 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
         raise NotImplementedError("Subclass of Constraint needs to implement this")
 
     def _record_constraints(self):
-        if self.manager.rank == 0:
+        data_parallel_rank = (
+            self.manager.group_rank("data_parallel") if self.manager.distributed else 0
+        )
+        if data_parallel_rank == 0:
             rec_inferencer_start = time.time()
             self.record_constraints()
             self.log.debug(
@@ -271,9 +281,12 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
             )
 
     def _record_validators(self, step):
-        if self.manager.rank == 0:
+        data_parallel_rank = (
+            self.manager.group_rank("data_parallel") if self.manager.distributed else 0
+        )
+        if data_parallel_rank == 0:
             rec_validation_start = time.time()
-            self.record_validators(step)
+            self.validator_outvar = self.record_validators(step)
             self.log.debug(
                 f"{self.step_str} saved validator results to {self.network_dir}"
             )
@@ -282,7 +295,10 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
             )
 
     def _record_inferencers(self, step):
-        if self.manager.rank == 0:
+        data_parallel_rank = (
+            self.manager.group_rank("data_parallel") if self.manager.distributed else 0
+        )
+        if data_parallel_rank == 0:
             rec_inferencer_start = time.time()
             self.record_inferencers(step)
             self.log.debug(
@@ -293,9 +309,12 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
             )
 
     def _record_monitors(self, step):
-        if self.manager.rank == 0:
+        data_parallel_rank = (
+            self.manager.group_rank("data_parallel") if self.manager.distributed else 0
+        )
+        if data_parallel_rank == 0:
             rec_monitor_start = time.time()
-            self.record_monitors(step)
+            self.monitor_outvar = self.record_monitors(step)
             self.log.debug(
                 f"{self.step_str} saved monitor results to {self.network_dir}"
             )
@@ -320,15 +339,48 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
                 f"{self.step_str} record monitor time: {time.time()-rec_monitor_start:10.3e}s"
             )
 
+    # check if stopping criterion is met
+    def _check_stopping_criterion(self, loss, losses, step):
+        if self.manager.rank == 0:
+            if self.stop_criterion_metric is None:
+                return False
+            elif step % self.stop_criterion_freq == 0:
+                criterion_metric_dict = {"loss": {"loss": loss.cpu().detach().numpy()}}
+                criterion_metric_dict["loss"].update(
+                    {key: val.cpu().detach().numpy() for key, val in losses.items()}
+                )
+                if self.has_monitors:
+                    criterion_metric_dict.update(
+                        {
+                            "monitor": {
+                                key: val.cpu().detach().numpy()
+                                for key, val in self.monitor_outvar.items()
+                            }
+                        }
+                    )
+                if self.has_validators:
+                    criterion_metric_dict.update(
+                        {
+                            "validation": {
+                                key: val.cpu().detach().numpy()
+                                for key, val in self.validator_outvar.items()
+                            }
+                        }
+                    )
+                stop_training = self.stop_criterion.evaluate(criterion_metric_dict)
+                return stop_training
+            else:
+                return False
+
     def _train_loop(
         self,
         sigterm_handler=None,
     ):  # TODO this train loop may be broken up into methods if need for future children classes
 
         # make directory if doesn't exist
-        if not os.path.exists(self.network_dir):
-            if self.manager.rank == 0:
-                os.makedirs(self.network_dir)
+        if self.manager.rank == 0:
+            # exist_ok=True to skip creating directory that already exists
+            os.makedirs(self.network_dir, exist_ok=True)
 
         # create global model for restoring and saving
         self.saveable_models = self.get_saveable_models()
@@ -376,6 +428,19 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
         enable_scaler = self.amp and self.amp_dtype == torch.float16
         self.scaler = GradScaler(enabled=enable_scaler)
 
+        # make stop criterion
+        if self.stop_criterion_metric is not None:
+            self.stop_criterion = StopCriterion(
+                self.stop_criterion_metric,
+                self.stop_criterion_min_delta,
+                self.stop_criterion_patience,
+                self.stop_criterion_mode,
+                self.stop_criterion_freq,
+                self.stop_criterion_strict,
+                self.cfg.training.rec_monitor_freq,
+                self.cfg.training.rec_validation_freq,
+            )
+
         # load network
         self.initial_step = self.load_network()
 
@@ -403,9 +468,6 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
             self.profiler_start_step = -1
             self.profiler_end_step = -1
 
-        # TorchScript backend options
-        self.use_nvfuser = self.cfg.jit and self.cfg.jit_use_nvfuser
-
         # Distributed barrier before starting the train loop
         if self.manager.distributed:
             dist.barrier(device_ids=[self.manager.local_rank])
@@ -430,11 +492,6 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
                 # Add NVTX context if in profile mode
                 self.log.warning("Running in profiling mode")
                 stack.enter_context(torch.autograd.profiler.emit_nvtx())
-
-            if self.use_nvfuser:
-                # Use nvfuser backend for scripted models
-                self.log.info("Using the nvfuser TorchScript backend")
-                stack.enter_context(torch.jit.fuser("fuser2"))
 
             for step in range(self.initial_step, self.max_steps + 1):
 
@@ -466,7 +523,7 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
                     # Load all data for constraints
                     self.load_data()
 
-                    self.optimizer.zero_grad()
+                    self.global_optimizer_model.zero_grad(set_to_none=True)
 
                     # compute gradients
                     loss, losses = self.compute_gradients(
@@ -555,7 +612,15 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
 
                 # save checkpoint
                 if step % self.save_network_freq == 0:
-                    if self.manager.rank == 0:
+                    # Get data parallel rank so all processes in the first model parallel group
+                    # can save their checkpoint. In the case without model parallelism, data_parallel_rank
+                    # should be the same as the process rank itself
+                    data_parallel_rank = (
+                        self.manager.group_rank("data_parallel")
+                        if self.manager.distributed
+                        else 0
+                    )
+                    if data_parallel_rank == 0:
                         self.save_checkpoint(step)
                         self.log.info(
                             f"{self.step_str} saved checkpoint to {add_hydra_run_path(self.network_dir)}"
@@ -601,10 +666,21 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
                     else:
                         t = time.time()
 
-                # stop criteria
+                # check stopping criterion
+                stop_training = self._check_stopping_criterion(loss, losses, step)
+                if stop_training:
+                    if self.manager.rank == 0:
+                        self.log.info(
+                            f"{self.step_str} stopping criterion is met, finished training!"
+                        )
+                    break
+
+                # check max steps
                 if step >= self.max_steps:
                     if self.manager.rank == 0:
-                        self.log.info(f"{self.step_str} finished training!")
+                        self.log.info(
+                            f"{self.step_str} reached maximum training steps, finished training!"
+                        )
                     break
 
                 torch.cuda.nvtx.range_pop()
@@ -620,7 +696,7 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
             self.warmup_stream.wait_stream(torch.cuda.current_stream())
             with torch.cuda.stream(self.warmup_stream):
                 # zero optimizer gradients
-                self.optimizer.zero_grad()
+                self.global_optimizer_model.zero_grad(set_to_none=True)
 
                 # # compute gradients
                 self.loss_static, self.losses_static = self.compute_gradients(
@@ -646,7 +722,7 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
             self.log.info("Attempting cuda graph building, this may take a bit...")
 
             self.g = torch.cuda.CUDAGraph()
-            self.optimizer.zero_grad(set_to_none=True)
+            self.global_optimizer_model.zero_grad(set_to_none=True)
             with torch.cuda.graph(self.g):
                 # compute gradients
                 self.loss_static, self.losses_static = self.compute_gradients(
@@ -782,22 +858,26 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
         log: logging.Logger,
         device: torch.device,
     ):
+        manager = DistributedManager()
+        model_parallel_rank = (
+            manager.group_rank("model_parallel") if manager.distributed else 0
+        )
+
         # attempt to restore optimizer
+        optimizer_checkpoint_file = (
+            network_dir + f"/optim_checkpoint.{model_parallel_rank}.pth"
+        )
         log.info("attempting to restore from: " + add_hydra_run_path(network_dir))
-        if os.path.exists(network_dir + "/optim_checkpoint.pth"):
+        if os.path.exists(optimizer_checkpoint_file):
             try:
-                checkpoint = torch.load(
-                    network_dir + "/optim_checkpoint.pth", map_location=device
-                )
+                checkpoint = torch.load(optimizer_checkpoint_file, map_location=device)
                 optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
                 aggregator.load_state_dict(checkpoint["aggregator_state_dict"])
                 scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
                 scaler.load_state_dict(checkpoint["scaler_state_dict"])
                 step = checkpoint["step"]
                 success = colored("Success loading optimizer: ", "green")
-                log.info(
-                    success + add_hydra_run_path(network_dir + "/optim_checkpoint.pth")
-                )
+                log.info(success + add_hydra_run_path(optimizer_checkpoint_file))
             except:
                 fail = colored("Fail loading optimizer: ", "red")
                 step = 0
@@ -818,6 +898,10 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
         log: logging.Logger,
         device: torch.device,
     ):
+        manager = DistributedManager()
+        model_parallel_rank = (
+            manager.group_rank("model_parallel") if manager.distributed else 0
+        )
 
         # attempt to restrore from initialization network dir
         if initialization_network_dir != "":
@@ -875,10 +959,16 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
         network_dir: str,
         device: Optional[torch.device] = None,
     ):
-        if os.path.exists(network_dir + "/optim_checkpoint.pth"):
+        manager = DistributedManager()
+        model_parallel_rank = (
+            manager.group_rank("model_parallel") if manager.distributed else 0
+        )
+
+        if os.path.exists(network_dir + f"/optim_checkpoint.{model_parallel_rank}.pth"):
             try:
                 checkpoint = torch.load(
-                    network_dir + "/optim_checkpoint.pth", map_location=device
+                    network_dir + f"/optim_checkpoint.{model_parallel_rank}.pth",
+                    map_location=device,
                 )
                 step = checkpoint["step"]
             except:
@@ -897,6 +987,14 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
         scaler: GradScaler,
         step: int,
     ):
+        # Get model parallel rank so all processes in the first model parallel group
+        # can save their checkpoint. In the case without model parallelism, model_parallel_rank
+        # should be the same as the process rank itself and only rank 0 saves
+        manager = DistributedManager()
+        model_parallel_rank = (
+            manager.group_rank("model_parallel") if manager.distributed else 0
+        )
+
         # save models
         for model in models:
             model.save(network_dir)
@@ -910,5 +1008,5 @@ class Trainer(AdamMixin, AdaHessianMixin, BFGSMixin):
                 "scheduler_state_dict": scheduler.state_dict(),
                 "scaler_state_dict": scaler.state_dict(),
             },
-            network_dir + "/optim_checkpoint.pth",
+            network_dir + f"/optim_checkpoint.{model_parallel_rank}.pth",
         )

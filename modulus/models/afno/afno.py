@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.fft
 from torch import Tensor
 
-from .arch import Arch
+from modulus.models.arch import Arch
 from modulus.key import Key
 
 

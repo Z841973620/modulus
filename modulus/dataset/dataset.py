@@ -18,10 +18,12 @@ class _BaseDataset:
 
         # get the distributed manager object
         manager = DistributedManager()
+        worker_rank = manager.group_rank("data_parallel") if manager.distributed else 0
+        worker_size = manager.group_size("data_parallel") if manager.distributed else 1
 
         # set different numpy seed per worker
         # set seed so first worker id's seed matches single-process case
-        np.random.seed(seed=(manager.rank + iworker * manager.world_size))
+        np.random.seed(seed=(worker_rank + iworker * worker_size))
 
     @property
     def invar_keys(self):

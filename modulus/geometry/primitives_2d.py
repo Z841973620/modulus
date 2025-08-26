@@ -339,8 +339,8 @@ class Triangle(Geometry):
         PH = OH - OP
         angle = acos(PH.dot(OH) / sqrt(PH.dot(PH)) / sqrt(OH.dot(OH)))
         apex_angle = atan2(base / 2, height)
-        hypo_sin = sqrt(height ** 2 + (base / 2) ** 2) * sin(apex_angle)
-        hypo_cos = sqrt(height ** 2 + (base / 2) ** 2) * cos(apex_angle)
+        hypo_sin = sqrt(height**2 + (base / 2) ** 2) * sin(apex_angle)
+        hypo_cos = sqrt(height**2 + (base / 2) ** 2) * cos(apex_angle)
         dist = sqrt(PH.dot(PH)) * sin(Min(angle - apex_angle, pi / 2))
 
         # curve for each side
@@ -366,7 +366,7 @@ class Triangle(Geometry):
                 "normal_y": 1 * sin(apex_angle),
             },
             parameterization=curve_parameterization,
-            area=sqrt(height ** 2 + (base / 2) ** 2),
+            area=sqrt(height**2 + (base / 2) ** 2),
         )
         curve_3 = SympyCurve(
             functions={
@@ -376,7 +376,7 @@ class Triangle(Geometry):
                 "normal_y": 1 * sin(apex_angle),
             },
             parameterization=curve_parameterization,
-            area=sqrt(height ** 2 + (base / 2) ** 2),
+            area=sqrt(height**2 + (base / 2) ** 2),
         )
         curves = [curve_1, curve_2, curve_3]
 
@@ -501,7 +501,7 @@ class Polygon(Geometry):
             # area
             dx = v2[0] - v1[0]
             dy = v2[1] - v1[1]
-            area = (dx ** 2 + dy ** 2) ** 0.5
+            area = (dx**2 + dy**2) ** 0.5
 
             # generate normals
             normal_x = dy / area
@@ -527,12 +527,12 @@ class Polygon(Geometry):
             dy = v1[1] - v2[1]
             px = x - v2[0]
             py = y - v2[1]
-            d_dot_d = dx ** 2 + dy ** 2
+            d_dot_d = dx**2 + dy**2
             p_dot_d = px * dx + py * dy
             max_min = Max(Min(p_dot_d / d_dot_d, 1.0), 0.0)
             vx = px - dx * max_min
             vy = py - dy * max_min
-            sdf = vx ** 2 + vy ** 2
+            sdf = vx**2 + vy**2
             sdfs.append(sdf)
 
             # winding calculation

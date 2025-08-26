@@ -7,6 +7,7 @@ import torch
 from dataclasses import dataclass
 from hydra.core.config_store import ConfigStore
 from omegaconf import MISSING, II
+from typing import Any
 
 from .loss import NTKConf
 
@@ -52,9 +53,23 @@ class VariationalTraining(DefaultTraining):
 
 
 @dataclass
-class VariationalTraining(DefaultTraining):
-    test_function: str = MISSING
-    use_quadratures: bool = False
+class StopCriterionConf:
+    metric: Any = MISSING
+    min_delta: Any = MISSING
+    patience: int = MISSING
+    mode: str = MISSING
+    freq: int = MISSING
+    strict: bool = MISSING
+
+
+@dataclass
+class DefaultStopCriterion(StopCriterionConf):
+    metric: Any = None
+    min_delta: Any = None
+    patience: int = 50000
+    mode: str = "min"
+    freq: int = 1000
+    strict: bool = False
 
 
 def register_training_configs() -> None:
@@ -69,4 +84,9 @@ def register_training_configs() -> None:
         group="training",
         name="variational_training",
         node=VariationalTraining,
+    )
+    cs.store(
+        group="stop_criterion",
+        name="default_stop_criterion",
+        node=DefaultStopCriterion,
     )

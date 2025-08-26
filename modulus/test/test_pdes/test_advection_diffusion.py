@@ -50,7 +50,7 @@ def test_advection_diffusion():
             "w": torch.tensor(w, dtype=torch.float32),
         }
     )
-    eq_eval = evaluations["advection_diffusion"].numpy()
+    eq_eval = evaluations["advection_diffusion_T"].numpy()
 
     # verify PDE computation
     assert np.allclose(eq_eval, advection_diffusion_equation_true), "Test Failed!"

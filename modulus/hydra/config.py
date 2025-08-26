@@ -11,12 +11,13 @@ from hydra.conf import RunDir, HydraConf
 from omegaconf import MISSING, SI
 from typing import List, Any
 from modulus.constants import JIT_PYTORCH_VERSION
+from packaging import version
 
 from .loss import LossConf
 from .optimizer import OptimizerConf
 from .pde import PDEConf
 from .scheduler import SchedulerConf
-from .training import TrainingConf
+from .training import TrainingConf, StopCriterionConf
 from .profiler import ProfilerConf
 from .hydra import default_hydra
 
@@ -31,8 +32,10 @@ class ModulusConfig:
     initialization_network_dir: str = ""
     save_filetypes: str = "vtk"
     summary_histograms: bool = False
-    jit: bool = bool(torch.__version__ == JIT_PYTORCH_VERSION)
-    jit_use_nvfuser: bool = False
+    jit: bool = version.parse(torch.__version__) >= version.parse(JIT_PYTORCH_VERSION)
+    jit_use_nvfuser: bool = True
+    jit_arch_mode: str = "only_activation"
+    jit_autograd_nodes: bool = False
 
     cuda_graphs: bool = True
     cuda_graph_warmup: int = 20
@@ -43,9 +46,11 @@ class ModulusConfig:
     debug: bool = False
     run_mode: str = "train"
 
-    arch: Any = MISSING  # List of archs
+    arch: Any = MISSING
+    models: Any = MISSING  # List of models
 
     training: TrainingConf = MISSING
+    stop_criterion: StopCriterionConf = MISSING
     loss: LossConf = MISSING
 
     optimizer: OptimizerConf = MISSING
@@ -62,6 +67,8 @@ class ModulusConfig:
 
 default_defaults = [
     {"training": "default_training"},
+    {"graph": "default"},
+    {"stop_criterion": "default_stop_criterion"},
     {"profiler": "nvtx"},
     {"override hydra/job_logging": "info_logging"},
     {"override hydra/launcher": "basic"},
@@ -80,6 +87,8 @@ class DefaultModulusConfig(ModulusConfig):
 # Modulus config for debugging
 debug_defaults = [
     {"training": "default_training"},
+    {"graph": "default"},
+    {"stop_criterion": "default_stop_criterion"},
     {"profiler": "nvtx"},
     {"override hydra/job_logging": "debug_logging"},
     {"override hydra/help": "modulus_help"},
@@ -99,6 +108,8 @@ class DebugModulusConfig(ModulusConfig):
 # Modulus config with experimental features (use caution)
 experimental_defaults = [
     {"training": "default_training"},
+    {"graph": "default"},
+    {"stop_criterion": "default_stop_criterion"},
     {"profiler": "nvtx"},
     {"override hydra/job_logging": "info_logging"},
     {"override hydra/launcher": "basic"},

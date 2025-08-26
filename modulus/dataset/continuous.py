@@ -79,7 +79,7 @@ class DictInferencePointwiseDataset(Dataset):
 
 class ContinuousPointwiseIterableDataset(IterableDataset):
     """
-    An infinitely iterable dataset for a continous set of pointwise training examples.
+    An infinitely iterable dataset for a continuous set of pointwise training examples.
     This will resample training examples (create new ones) every iteration.
     """
 
@@ -250,7 +250,7 @@ class ListIntegralDataset(_DictDatasetMixin, Dataset):
 
 class ContinuousIntegralIterableDataset(IterableDataset):
     """
-    An infinitely iterable dataset for a continous set of integral training examples.
+    An infinitely iterable dataset for a continuous set of integral training examples.
     This will resample training examples (create new ones) every iteration.
     """
 

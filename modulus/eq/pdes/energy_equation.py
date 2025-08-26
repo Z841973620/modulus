@@ -5,7 +5,7 @@ http://dl.icdst.org/pdfs/files1/2fe68e957cdf09a4862088ed279f00b0.pdf
 http://farside.ph.utexas.edu/teaching/336L/Fluidhtml/node14.html#e4.67
 """
 
-from sympy import Symbol, Function
+from sympy import Symbol, Function, Number
 from sympy import *
 from modulus.eq.pde import PDE
 from ..constants import diff
@@ -40,6 +40,8 @@ class EnergyFluid(PDE):  # TODO clean function simlar to others
         Dimension of the energy equation (2 or 3). Default is 3.
     time : bool
         If time-dependent equations or not. Default is False.
+    mixed_form: bool
+        If True, use the mixed formulation of the diffusion equations.
 
     Examples
     ========
@@ -57,6 +59,7 @@ class EnergyFluid(PDE):  # TODO clean function simlar to others
         visc_heating=False,
         dim=3,
         time=False,
+        mixed_form=False,
     ):
         # set params
         self.dim = dim
@@ -64,6 +67,7 @@ class EnergyFluid(PDE):  # TODO clean function simlar to others
         self.nu = nu
         self.rho = rho
         self.visc_heating = visc_heating
+        self.mixed_form = mixed_form
 
         # specific heat
         self.cp = cp
@@ -117,14 +121,46 @@ class EnergyFluid(PDE):  # TODO clean function simlar to others
 
         # set equations
         self.equations = {}
-        self.equations["temperauture_fluid"] = (
-            rho * cp * (T.diff(t) + u * (T.diff(x)) + v * (T.diff(y)) + w * (T.diff(z)))
-            - kappa * (T.diff(x)).diff(x)
-            - kappa * (T.diff(y)).diff(y)
-            - kappa * (T.diff(z)).diff(z)
-            - p_work
-            - visc_h
-        )
+
+        if not self.mixed_form:
+            self.equations["temperauture_fluid"] = (
+                rho
+                * cp
+                * (T.diff(t) + u * (T.diff(x)) + v * (T.diff(y)) + w * (T.diff(z)))
+                - kappa * (T.diff(x)).diff(x)
+                - kappa * (T.diff(y)).diff(y)
+                - kappa * (T.diff(z)).diff(z)
+                - p_work
+                - visc_h
+            )
+        elif self.mixed_form:
+            T_x = Function("T_x")(x, y, z, t)
+            T_y = Function("T_y")(x, y, z, t)
+            if self.dim == 3:
+                T_z = Function("T_z")(x, y, z, t)
+            else:
+                T_z = Number(0)
+
+            self.equations["temperauture_fluid"] = (
+                rho
+                * cp
+                * (T.diff(t) + u * (T.diff(x)) + v * (T.diff(y)) + w * (T.diff(z)))
+                - kappa * (T_x).diff(x)
+                - kappa * (T_y).diff(y)
+                - kappa * (T_z).diff(z)
+                - p_work
+                - visc_h
+            )
+            self.equations["compatibility_T_x"] = T.diff(x) - T_x
+            self.equations["compatibility_T_y"] = T.diff(y) - T_y
+            self.equations["compatibility_T_z"] = T.diff(z) - T_z
+            self.equations["compatibility_T_xy"] = T_x.diff(y) - T_y.diff(x)
+            self.equations["compatibility_T_xz"] = T_x.diff(z) - T_z.diff(x)
+            self.equations["compatibility_T_yz"] = T_y.diff(z) - T_z.diff(y)
+            if self.dim == 2:
+                self.equations.pop("compatibility_T_z")
+                self.equations.pop("compatibility_T_xz")
+                self.equations.pop("compatibility_T_yz")
 
         input_variables = {"x": x, "y": y, "z": z, "t": t}
         if self.dim == 2:
@@ -142,3 +178,9 @@ class EnergyFluid(PDE):  # TODO clean function simlar to others
             self.subs(Function("rho")(*input_variables), self.rho)
         if type(self.nu) == float:
             self.subs(Function("nu")(*input_variables), self.nu)
+
+        if self.mixed_form:
+            self.subs(T_x, Function("T_x")(*input_variables))
+            self.subs(T_y, Function("T_y")(*input_variables))
+            if self.dim == 3:
+                self.subs(T_z, Function("T_z")(*input_variables))

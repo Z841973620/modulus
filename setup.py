@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="modulus",
-    version="22.07",
+    version="22.09",
     author="Modulus Team",
     packages=find_packages(),
     install_requires=[

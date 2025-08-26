@@ -14,13 +14,13 @@ class FitToPoly(nn.Module):
     def forward(self, x):
         x1, x2, x3 = x[:, 0:1], x[:, 1:2], x[:, 2:3]
         losses = {
-            "loss_x": (torch.relu(torch.mm(self.w, x1) + self.b - x1 ** 2))
+            "loss_x": (torch.relu(torch.mm(self.w, x1) + self.b - x1**2))
             .abs()
             .mean(),
-            "loss_y": (torch.relu(torch.mm(self.w, x2) + self.b - x2 ** 2.0))
+            "loss_y": (torch.relu(torch.mm(self.w, x2) + self.b - x2**2.0))
             .abs()
             .mean(),
-            "loss_z": (torch.relu(torch.mm(self.w, x3) + self.b + x3 ** 2.0))
+            "loss_z": (torch.relu(torch.mm(self.w, x3) + self.b + x3**2.0))
             .abs()
             .mean(),
         }

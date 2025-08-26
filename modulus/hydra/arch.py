@@ -10,45 +10,117 @@ from typing import Any, Union, List, Dict, Tuple
 
 @dataclass
 class ModelConf:
-    _target_: str = MISSING
+    arch_type: str = MISSING
+    input_keys: Any = MISSING
+    output_keys: Any = MISSING
+    detach_keys: Any = MISSING
+    scaling: Any = None
+
+
+@dataclass
+class AFNOConf(ModelConf):
+    arch_type: str = "afno"
+    img_shape: Tuple[int] = MISSING
+    patch_size: int = 16
+    embed_dim: int = 256
+    depth: int = 4
+    num_blocks: int = 8
+
+
+@dataclass
+class DistributedAFNOConf(ModelConf):
+    arch_type: str = "distributed_afno"
+    img_shape: Tuple[int] = MISSING
+    patch_size: int = 16
+    embed_dim: int = 256
+    depth: int = 4
+    num_blocks: int = 8
+    channel_parallel_inputs: bool = False
+    channel_parallel_outputs: bool = False
+
+
+@dataclass
+class DeepOConf(ModelConf):
+    arch_type: str = "deeponet"
+    # branch_net: Union[Arch, str],
+    # trunk_net: Union[Arch, str],
+    trunk_dim: Any = None  # Union[None, int]
+    branch_dim: Any = None  # Union[None, int]
+
+
+@dataclass
+class FNOConf(ModelConf):
+    arch_type: str = "fno"
+    dimension: int = MISSING
+    # decoder_net: Arch
+    nr_fno_layers: int = 4
+    fno_modes: Any = 16  # Union[int, List[int]]
+    padding: int = 8
+    padding_type: str = "constant"
+    activation_fn: str = "gelu"
+    coord_features: bool = True
+
+
+@dataclass
+class FourierConf(ModelConf):
+    arch_type: str = "fourier"
+    frequencies: Any = "('axis', [i for i in range(10)])"
+    frequencies_params: Any = "('axis', [i for i in range(10)])"
+    activation_fn: str = "silu"
+    layer_size: int = 512
+    nr_layers: int = 6
+    skip_connections: bool = False
+    weight_norm: bool = True
+    adaptive_activations: bool = False
 
 
 @dataclass
 class FullyConnectedConf(ModelConf):
 
-    _target_: str = "modulus.models.fully_connected.FullyConnectedArch"
+    arch_type: str = "fully_connected"
     layer_size: int = 512
     nr_layers: int = 6
     skip_connections: bool = False
-    # activation_fn = layers.Activation.SILU
+    activation_fn: str = "silu"
+    adaptive_activations: bool = False
+    weight_norm: bool = True
+
+
+@dataclass
+class ConvFullyConnectedConf(ModelConf):
+    arch_type: str = "conv_fully_connected"
+    layer_size: int = 512
+    nr_layers: int = 6
+    skip_connections: bool = False
+    activation_fn: str = "silu"
     adaptive_activations: bool = False
     weight_norm: bool = True
 
 
 @dataclass
 class FusedMLPConf(ModelConf):
-    _target_: str = "modulus.models.fused_mlp.FusedMLPArch"
+    arch_type: str = "fused_fully_connected"
     layer_size: int = 128
     nr_layers: int = 6
-    # activation_fn = layers.Activation.SIGMOID
+    activation_fn: str = "sigmoid"
 
 
 @dataclass
 class FusedFourierNetConf(ModelConf):
-    _target_: str = "modulus.models.fused_mlp.FusedFourierNetArch"
+    arch_type: str = "fused_fourier"
     layer_size: int = 128
     nr_layers: int = 6
-    # activation_fn = layers.Activation.SIGMOID
+    activation_fn: str = "sigmoid"
     n_frequencies: int = 12
 
 
 @dataclass
 class FusedGridEncodingNetConf(ModelConf):
 
-    _target_: str = "modulus.models.fused_mlp.FusedGridEncodingNetArch"
+    arch_type: str = "fused_hash_encoding"
     layer_size: int = 128
     nr_layers: int = 6
-    # activation_fn = layers.Activation.SIGMOID
+    activation_fn: str = "sigmoid"
     indexing: str = "Hash"
     n_levels: int = 16
     n_features_per_level: int = 2
@@ -59,24 +131,27 @@ class FusedGridEncodingNetConf(ModelConf):
 
 
 @dataclass
-class FourierConf(ModelConf):
-    _target_: str = "modulus.models.fourier_net.FourierNetArch"
-    # frequencies=("axis", [i for i in range(10)]),
-    # frequencies_params=("axis", [i for i in range(10)]),
-    # activation_fn=layers.Activation.SILU,
-    layer_size: int = 512
-    nr_layers: int = 6
+class MultiresolutionHashNetConf(ModelConf):
+    arch_type: str = "hash_encoding"
+    layer_size: int = 64
+    nr_layers: int = 3
     skip_connections: bool = False
     weight_norm: bool = True
     adaptive_activations: bool = False
+    bounds: Any = "[(1.0, 1.0), (1.0, 1.0)]"
+    nr_levels: int = 16
+    nr_features_per_level: int = 2
+    log2_hashmap_size: int = 19
+    base_resolution: int = 2
+    finest_resolution: int = 32
 
 
 @dataclass
 class HighwayFourierConf(ModelConf):
-    _target_: str = "modulus.models.highway_fourier_net.HighwayFourierNetArch"
-    # frequencies: Any = ("axis", [i for i in range(10)])
-    # frequencies_params: Any = ("axis", [i for i in range(10)])
-    # activation_fn=layers.Activation.SILU
+    arch_type: str = "highway_fourier"
+    frequencies: Any = "('axis', [i for i in range(10)])"
+    frequencies_params: Any = "('axis', [i for i in range(10)])"
+    activation_fn: str = "silu"
     layer_size: int = 512
     nr_layers: int = 6
     skip_connections: bool = False
@@ -88,10 +163,10 @@ class HighwayFourierConf(ModelConf):
 
 @dataclass
 class ModifiedFourierConf(ModelConf):
-    _target_: str = "modulus.models.modified_fourier_net.ModifiedFourierNetArch"
-    # frequencies: Any = ("axis", [i for i in range(10)])
-    # frequencies_params: Any = ("axis", [i for i in range(10)])
-    # activation_fn=layers.Activation.SILU
+    arch_type: str = "modified_fourier"
+    frequencies: Any = "('axis', [i for i in range(10)])"
+    frequencies_params: Any = "('axis', [i for i in range(10)])"
+    activation_fn: str = "silu"
     layer_size: int = 512
     nr_layers: int = 6
     skip_connections: bool = False
@@ -101,14 +176,12 @@ class ModifiedFourierConf(ModelConf):
 
 @dataclass
 class MultiplicativeFilterConf(ModelConf):
-    _target_: str = (
-        "modulus.models.multiplicative_filter_net.MultiplicativeFilterNetArch"
-    )
+    arch_type: str = "multiplicative_fourier"
     layer_size: int = 512
     nr_layers: int = 6
     skip_connections: bool = False
-    # activation_fn=layers.Activation.IDENTITY
-    # filter_type: FilterType = FilterType.FOURIER
+    activation_fn: str = "identity"
+    filter_type: str = "fourier"
     weight_norm: bool = True
     input_scale: float = 10.0
     gabor_alpha: float = 6.0
@@ -120,10 +193,10 @@ class MultiplicativeFilterConf(ModelConf):
 
 @dataclass
 class MultiscaleFourierConf(ModelConf):
-    _target_: str = "modulus.models.multiscale_fourier_net.MultiscaleFourierNetArch"
-    # frequencies: Any = field(default_factory=lambda: [32])
+    arch_type: str = "multiscale_fourier"
+    frequencies: Any = field(default_factory=lambda: [32])
     frequencies_params: Any = None
-    # activation_fn=layers.Activation.SILU,
+    activation_fn: str = "silu"
     layer_size: int = 512
     nr_layers: int = 6
     skip_connections: bool = False
@@ -132,8 +205,21 @@ class MultiscaleFourierConf(ModelConf):
 
 
 @dataclass
+class Pix2PixConf(ModelConf):
+    arch_type: str = "pix2pix"
+    dimension: int = MISSING
+    conv_layer_size: int = 64
+    n_downsampling: int = 3
+    n_blocks: int = 3
+    scaling_factor: int = 1
+    batch_norm: bool = True
+    padding_type: str = "reflect"
+    activation_fn: str = "relu"
+
+
+@dataclass
 class SirenConf(ModelConf):
-    _target_: str = "modulus.models.siren.SirenArch"
+    arch_type: str = "siren"
     layer_size: int = 512
     nr_layers: int = 6
     first_omega: float = 30.0
@@ -144,73 +230,39 @@ class SirenConf(ModelConf):
 
 
 @dataclass
-class MultiresolutionHashNetConf(ModelConf):
-    _target_: str = "modulus.models.hash_encoding_net.MultiresolutionHashNetArch"
-    layer_size: int = 64
-    nr_layers: int = 3
-    skip_connections: bool = False
-    weight_norm: bool = False
-    adaptive_activations: bool = False
-    # bounds: List[Tuple[float, float]] = [(1.0, 1.0), (1.0, 1.0)]
-    nr_levels: int = 5
-    nr_features_per_level: int = 2
-    log2_hashmap_size: int = 19
-    base_resolution: int = 2
-    finest_resolution: int = 32
-
-
-@dataclass
-class FNOConf(ModelConf):
-    _target_: str = "modulus.models.fno.FNOArch"
-    dimension: int = MISSING
-    nr_fno_layers: int = 4
-    fno_layer_size: int = 32
-    fno_modes: Any = 16  # Change it Union[int, List[int]]
-    padding: int = 8
-    padding_type: str = "constant"
-    output_fc_layer_sizes: List[int] = field(default_factory=lambda: [16])
-    # activation_fn: Activation = Activation.GELU
-    coord_features: bool = True
-
-
-@dataclass
-class AFNOConf(ModelConf):
-    _target_: str = "modulus.models.afno.AFNOArch"
-    img_shape: Tuple[int] = MISSING
-    patch_size: int = 16
-    embed_dim: int = 256
-    depth: int = 4
-    num_blocks: int = 8
-
-
-@dataclass
 class SRResConf(ModelConf):
-    _target_: str = "modulus.models.super_res_net.SRResNetArch"
+    arch_type: str = "super_res"
     large_kernel_size: int = 7
     small_kernel_size: int = 3
     conv_layer_size: int = 32
     n_resid_blocks: int = 8
     scaling_factor: int = 8
-    # activation_fn: Activation = Activation.PRELU
-
-
-@dataclass
-class Pix2PixConf(ModelConf):
-    _target_: str = "modulus.models.pix2pix.Pix2PixArch"
-    dimension: int = MISSING
-    conv_layer_size: int = 64
-    n_downsampling: int = 3
-    n_blocks: int = 3
-    scaling_factor: int = 1
-    batch_norm: bool = True
-    padding_type: str = "reflect"
-    # activation_fn: Activation = Activation.RELU
+    activation_fn: str = "prelu"
 
 
 def register_arch_configs() -> None:
     # Information regarding multiple config groups
     # https://hydra.cc/docs/next/patterns/select_multiple_configs_from_config_group/
     cs = ConfigStore.instance()
+
+    cs.store(
+        group="arch",
+        name="fused_fully_connected",
+        node={"fused_fully_connected": FusedMLPConf()},
+    )
+
+    cs.store(
+        group="arch",
+        name="fused_fourier",
+        node={"fused_fourier": FusedFourierNetConf()},
+    )
+
+    cs.store(
+        group="arch",
+        name="fused_hash_encoding",
+        node={"fused_hash_encoding": FusedGridEncodingNetConf()},
+    )
+
     cs.store(
         group="arch",
         name="fully_connected",
@@ -219,26 +271,14 @@ def register_arch_configs() -> None:
 
     cs.store(
         group="arch",
-        name="fused_mlp",
-        node={"fused_mlp": FusedMLPConf()},
+        name="conv_fully_connected",
+        node={"conv_fully_connected": ConvFullyConnectedConf()},
     )
 
     cs.store(
         group="arch",
-        name="fused_fourier_net",
-        node={"fused_fourier_net": FusedFourierNetConf()},
-    )
-
-    cs.store(
-        group="arch",
-        name="fused_grid_encoding_net",
-        node={"fused_grid_encoding_net": FusedGridEncodingNetConf()},
-    )
-
-    cs.store(
-        group="arch",
-        name="fourier_net",
-        node={"fourier_net": FourierConf()},
+        name="fourier",
+        node={"fourier": FourierConf()},
     )
 
     cs.store(
@@ -273,8 +313,8 @@ def register_arch_configs() -> None:
 
     cs.store(
         group="arch",
-        name="hash_net",
-        node={"hash_net": MultiresolutionHashNetConf()},
+        name="hash_encoding",
+        node={"hash_encoding": MultiresolutionHashNetConf()},
     )
 
     cs.store(
@@ -287,6 +327,18 @@ def register_arch_configs() -> None:
         group="arch",
         name="afno",
         node={"afno": AFNOConf()},
+    )
+
+    cs.store(
+        group="arch",
+        name="distributed_afno",
+        node={"distributed_afno": DistributedAFNOConf()},
+    )
+
+    cs.store(
+        group="arch",
+        name="deeponet",
+        node={"deeponet": DeepOConf()},
     )
 
     cs.store(
@@ -304,91 +356,109 @@ def register_arch_configs() -> None:
     # Schemas for extending models
     # Info: https://hydra.cc/docs/next/patterns/extending_configs/
     cs.store(
-        group="arch_schema",
-        name="fully_connected",
+        group="arch",
+        name="fully_connected_cfg",
         node=FullyConnectedConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="fused_mlp",
+        group="arch",
+        name="conv_fully_connected_cfg",
+        node=ConvFullyConnectedConf,
+    )
+
+    cs.store(
+        group="arch",
+        name="fused_mlp_cfg",
         node=FusedMLPConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="fused_fourier_net",
+        group="arch",
+        name="fused_fourier_net_cfg",
         node=FusedFourierNetConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="fused_grid_encoding_net",
+        group="arch",
+        name="fused_grid_encoding_net_cfg",
         node=FusedGridEncodingNetConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="fourier_net",
+        group="arch",
+        name="fourier_cfg",
         node=FourierConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="highway_fourier",
+        group="arch",
+        name="highway_fourier_cfg",
         node=HighwayFourierConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="modified_fourier",
+        group="arch",
+        name="modified_fourier_cfg",
         node=ModifiedFourierConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="multiplicative_fourier",
+        group="arch",
+        name="multiplicative_fourier_cfg",
         node=MultiplicativeFilterConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="multiscale_fourier",
+        group="arch",
+        name="multiscale_fourier_cfg",
         node=MultiscaleFourierConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="siren",
+        group="arch",
+        name="siren_cfg",
         node=SirenConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="hash_net",
+        group="arch",
+        name="hash_net_cfg",
         node=MultiresolutionHashNetConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="fno",
+        group="arch",
+        name="fno_cfg",
         node=FNOConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="afno",
+        group="arch",
+        name="afno_cfg",
         node=AFNOConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="super_res",
+        group="arch",
+        name="distributed_afno_cfg",
+        node=DistributedAFNOConf,
+    )
+
+    cs.store(
+        group="arch",
+        name="deeponet_cfg",
+        node=DeepOConf,
+    )
+
+    cs.store(
+        group="arch",
+        name="super_res_cfg",
         node=SRResConf,
     )
 
     cs.store(
-        group="arch_schema",
-        name="pix2pix",
+        group="arch",
+        name="pix2pix_cfg",
         node=Pix2PixConf,
     )

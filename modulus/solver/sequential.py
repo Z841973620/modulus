@@ -4,6 +4,7 @@ from typing import List, Union, Tuple, Callable
 from omegaconf import DictConfig
 import warnings
 
+from modulus.distributed.manager import DistributedManager
 from modulus.trainer import Trainer
 from modulus.domain import Domain
 from modulus.loss.aggregator import NTK
@@ -95,8 +96,8 @@ class SequentialSolver(Solver):
     def solve(self, sigterm_handler=None):
         if self.cfg.run_mode == "train":
             # make directory if doesn't exist
-            if not os.path.exists(self.network_dir):
-                os.makedirs(self.network_dir)
+            if DistributedManager().rank == 0:
+                os.makedirs(self.network_dir, exist_ok=True)
 
             # run train loop for each domain and each index
             # solve for each domain in seq_train_domin

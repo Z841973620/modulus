@@ -155,6 +155,7 @@ class GridValidator(Validator):
                 writer.add_scalar(
                     "Validators/" + name + "/" + k, loss, step, new_style=True
                 )
+        return losses
 
 
 class _DeepONet_Validator(Validator):
@@ -330,6 +331,7 @@ class DeepONet_Physics_Validator(_DeepONet_Validator):
                 writer.add_scalar(
                     "Validators/" + name + "/" + k, loss, step, new_style=True
                 )
+        return losses
 
     @staticmethod
     def _l2_relative_error(true_var, pred_var):  # TODO replace with metric classes
@@ -460,3 +462,4 @@ class DeepONet_Data_Validator(_DeepONet_Validator):
                 writer.add_scalar(
                     "Validators/" + name + "/" + k, loss, step, new_style=True
                 )
+        return losses

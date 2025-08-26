@@ -6,14 +6,14 @@ from typing import Dict, List, Tuple
 import itertools
 
 import modulus.models.fully_connected as fully_connected
-import modulus.models.layers.layers as layers
-from .interpolation import (
+import modulus.models.layers as layers
+from modulus.models.interpolation import (
     _grid_knn_idx,
     _hyper_cube_weighting,
     smooth_step_2,
     linear_step,
 )
-from .arch import Arch
+from modulus.models.arch import Arch
 from modulus.key import Key
 from modulus.distributed import DistributedManager
 
@@ -111,7 +111,7 @@ class MultiresolutionHashNetArch(Arch):
 
         # make embeddings
         self.embedding = nn.Embedding(
-            self.nr_levels * 2 ** self.log2_hashmap_size, self.nr_features_per_level
+            self.nr_levels * 2**self.log2_hashmap_size, self.nr_features_per_level
         )
         nn.init.uniform_(self.embedding.weight, a=-0.001, b=0.001)
         self.b = np.exp(
@@ -125,13 +125,13 @@ class MultiresolutionHashNetArch(Arch):
         list_resolution = []
         for i in range(self.nr_levels):
             # calculate resolution
-            resolution = int(np.floor(self.base_resolution * self.b ** i))
+            resolution = int(np.floor(self.base_resolution * self.b**i))
             list_resolution.append(
                 torch.tensor([resolution]).to(self.device).view(1, 1)
             )
 
             # make adjust factor
-            adjust_factor = ((8253729 ** i + 2396403) % 32767) / 32767.0
+            adjust_factor = ((8253729**i + 2396403) % 32767) / 32767.0
 
             # compute grid and adjust it
             not_adjusted_dx = [(x[1] - x[0]) / (resolution - 1) for x in self.bounds]

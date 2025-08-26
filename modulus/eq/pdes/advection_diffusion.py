@@ -36,6 +36,8 @@ class AdvectionDiffusion(PDE):
         Dimension of the diffusion equation (1, 2, or 3). Default is 3.
     time : bool
         If time-dependent equations or not. Default is False.
+    mixed_form: bool
+        If True, use the mixed formulation of the wave equation.
 
     Examples
     ========
@@ -49,11 +51,14 @@ class AdvectionDiffusion(PDE):
 
     name = "AdvectionDiffusion"
 
-    def __init__(self, T="T", D="D", Q=0, rho="rho", dim=3, time=False):
+    def __init__(
+        self, T="T", D="D", Q=0, rho="rho", dim=3, time=False, mixed_form=False
+    ):
         # set params
         self.T = T
         self.dim = dim
         self.time = time
+        self.mixed_form = mixed_form
 
         # coordinates
         x, y, z = Symbol("x"), Symbol("y"), Symbol("z")
@@ -98,15 +103,50 @@ class AdvectionDiffusion(PDE):
         elif type(rho) in [float, int]:
             rho = Number(rho)
 
-        # curl
-        curl = Number(0) if rho.diff() == 0 else u.diff(x) + v.diff(y) + w.diff(z)
-
         # set equations
         self.equations = {}
-        advection = u * (T.diff(x)) + v * (T.diff(y)) + w * (T.diff(z))
-        diffusion = (
-            (D * T.diff(x)).diff(x) + (D * T.diff(y)).diff(y) + (D * T.diff(z)).diff(z)
+        advection = (
+            rho * u * (T.diff(x)) + rho * v * (T.diff(y)) + rho * w * (T.diff(z))
         )
-        self.equations["advection_diffusion"] = (
-            T.diff(t) + advection + T * curl - diffusion
-        )
+        if not self.mixed_form:
+            diffusion = (
+                (rho * D * T.diff(x)).diff(x)
+                + (rho * D * T.diff(y)).diff(y)
+                + (rho * D * T.diff(z)).diff(z)
+            )
+            self.equations["advection_diffusion_" + self.T] = (
+                T.diff(t) + advection - diffusion - Q
+            )
+
+        elif self.mixed_form:
+            T_x = Function(self.T + "_x")(*input_variables)
+            T_y = Function(self.T + "_y")(*input_variables)
+            if self.dim == 3:
+                T_z = Function(self.T + "_z")(*input_variables)
+            else:
+                T_z = Number(0)
+
+            diffusion = (
+                (rho * D * T_x).diff(x)
+                + (rho * D * T_y).diff(y)
+                + (rho * D * T_z).diff(z)
+            )
+            self.equations["compatibility_" + self.T + "_x"] = T.diff(x) - T_x
+            self.equations["compatibility_" + self.T + "_y"] = T.diff(y) - T_y
+            self.equations["compatibility_" + self.T + "_z"] = T.diff(z) - T_z
+            self.equations["compatibility_" + self.T + "_xy"] = T_x.diff(y) - T_y.diff(
+                x
+            )
+            self.equations["compatibility_" + self.T + "_xz"] = T_x.diff(z) - T_z.diff(
+                x
+            )
+            self.equations["compatibility_" + self.T + "_yz"] = T_y.diff(z) - T_z.diff(
+                y
+            )
+            if self.dim == 2:
+                self.equations.pop("compatibility_" + self.T + "_z")
+                self.equations.pop("compatibility_" + self.T + "_xz")
+                self.equations.pop("compatibility_" + self.T + "_yz")
+            self.equations["advection_diffusion_" + self.T] = (
+                T.diff(t) + advection - diffusion - Q
+            )

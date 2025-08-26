@@ -31,7 +31,6 @@ class Constraint:
         shuffle: bool,
         drop_last: bool,
         num_workers: int,
-        jit_autograd_nodes: bool = True,
     ):
         # Get DDP manager
         self.manager = DistributedManager()
@@ -57,7 +56,6 @@ class Constraint:
             nodes,
             Key.convert_list(self.dataset.invar_keys),
             Key.convert_list(self.dataset.outvar_keys),
-            jit_autograd_nodes=jit_autograd_nodes,
         )
         self.model.to(self.device)
         if self.manager.distributed:
@@ -71,6 +69,9 @@ class Constraint:
                     output_device=self.device,
                     broadcast_buffers=self.manager.broadcast_buffers,
                     find_unused_parameters=self.manager.find_unused_parameters,
+                    process_group=self.manager.group(
+                        "data_parallel"
+                    ),  # None by default
                 )
             torch.cuda.current_stream().wait_stream(s)
 
@@ -155,8 +156,8 @@ class Constraint:
             if distributed is not False and manager.distributed:
                 sampler = DistributedSampler(
                     dataset,
-                    num_replicas=manager.world_size,
-                    rank=manager.rank,
+                    num_replicas=manager.group_size("data_parallel"),
+                    rank=manager.group_rank("data_parallel"),
                     shuffle=shuffle,
                     drop_last=drop_last,
                 )

@@ -4,6 +4,7 @@ import os
 import torch
 import logging
 import copy
+import pprint
 
 from termcolor import colored
 from pathlib import Path
@@ -16,10 +17,11 @@ from hydra.utils import get_original_cwd
 from modulus.key import Key
 from modulus.models.arch import Arch
 from modulus.distributed import DistributedManager
+from modulus.models.utils import ModulusModels
+from modulus.models.layers import Activation
 
 from .arch import ModelConf
 from .config import register_modulus_configs, ModulusConfig
-from .callbacks import register_callbacks_configs
 from .hydra import register_hydra_configs
 from .loss import register_loss_configs
 from .metric import register_metric_configs
@@ -29,6 +31,8 @@ from .pde import register_pde_configs
 from .profiler import register_profiler_configs
 from .scheduler import register_scheduler_configs
 from .training import register_training_configs
+from .callbacks import register_callbacks_configs
+from .graph import register_graph_configs
 
 
 logger = logging.getLogger(__name__)
@@ -55,12 +59,26 @@ def main(config_path: str, config_name: str = "config"):
             register_scheduler_configs()
             register_training_configs()
             register_modulus_configs()
+            register_graph_configs()
 
             # Set number of intraop torch CPU threads
             torch.set_num_threads(1)  # TODO: define this as a hydra config somehow
 
             # Setup distributed process config
             DistributedManager.initialize()
+            # Create model parallel process group
+            model_parallel_size = os.getenv(
+                "MODEL_PARALLEL_SIZE"
+            )  # TODO: get this from config instead
+            if model_parallel_size:
+                # Create model parallel process group
+                DistributedManager.create_process_subgroup(
+                    "model_parallel", int(model_parallel_size), verbose=True
+                )
+                # Create data parallel process group for DDP allreduce
+                DistributedManager.create_orthogonal_process_group(
+                    "data_parallel", "model_parallel", verbose=True
+                )
 
             # Pass through dict config
             if cfg_passthrough is not None:
@@ -111,7 +129,7 @@ def compose(
         Stack depth of this function call (needed for finding config relative to python).
 
     """
-    # Clear already initalized hydra
+    # Clear already initialized hydra
     hydra.core.global_hydra.GlobalHydra.instance().clear()
 
     hydra.initialize(
@@ -131,6 +149,7 @@ def compose(
     register_scheduler_configs()
     register_training_configs()
     register_modulus_configs()
+    register_graph_configs()
 
     cfg = hydra.compose(
         config_name=config_name,
@@ -142,31 +161,60 @@ def compose(
 
 
 def instantiate_arch(
-    input_keys: List[Key], output_keys: List[Key], cfg: ModelConf, **kwargs
+    cfg: ModelConf,
+    input_keys: Union[List[Key], None] = None,
+    output_keys: Union[List[Key], None] = None,
+    detach_keys: Union[List[Key], None] = None,
+    verbose: bool = False,
+    **kwargs,
 ) -> Arch:
     # Function for instantiating a modulus architecture with hydra
     assert hasattr(
-        cfg, "_target_"
-    ), "Improper architecture supplied, please make sure config \
+        cfg, "arch_type"
+    ), "Model configs are required to have an arch_type defined. \
+        Improper architecture supplied, please make sure config \
         provided is a single arch config NOT the full hydra config!"
 
     try:
-        model = hydra.utils.instantiate(
-            cfg,
-            input_keys=input_keys,
-            output_keys=output_keys,
-            **kwargs,
-            _convert_="all",  # Convert all OmegaConf containers to primative types
-        )
+        # Convert to python dictionary
+        model_cfg = OmegaConf.to_container(cfg, resolve=True)
+
+        # Get model class beased on arch type
+        modulus_models = ModulusModels()
+        model_arch = modulus_models[model_cfg["arch_type"]]
+        del model_cfg["arch_type"]
+
+        # Add keys if present
+        if not input_keys is None:
+            model_cfg["input_keys"] = input_keys
+        if not output_keys is None:
+            model_cfg["output_keys"] = output_keys
+        if not detach_keys is None:
+            model_cfg["detach_keys"] = detach_keys
+
+        # Add any additional kwargs
+        for key, value in kwargs.items():
+            model_cfg[key] = value
+
+        # Init model from config dictionary
+        model, param = model_arch.from_config(model_cfg)
+
+        # Verbose printing
+        if verbose:
+            pp = pprint.PrettyPrinter(indent=4)
+            logger.info(f"Initialized models with parameters: \n")
+            pp.pprint(param)
+
     except Exception as e:
-        fail = colored("Failed to initialize architecture: \n", "red")
-        logger.error(fail + to_yaml(cfg))
+        fail = colored(f"Failed to initialize architecture.\n {model_cfg}", "red")
         raise Exception(fail) from e
 
     return model
 
 
-def instantiate_optim(cfg: DictConfig, model: torch.nn.Module) -> torch.optim.Optimizer:
+def instantiate_optim(
+    cfg: DictConfig, model: torch.nn.Module, verbose: bool = False
+) -> torch.optim.Optimizer:
     # Function for instantiating an optimizer with hydra
     # Remove custom parameters used internally in modulus
     optim_cfg = copy.deepcopy(cfg.optimizer)
@@ -178,6 +226,11 @@ def instantiate_optim(cfg: DictConfig, model: torch.nn.Module) -> torch.optim.Op
         fail = colored("Failed to initialize optimizer: \n", "red")
         logger.error(fail + to_yaml(optim_cfg))
         raise Exception(fail) from e
+
+    if verbose:
+        pp = pprint.PrettyPrinter(indent=4)
+        logger.info(f"Initialized optimizer: \n")
+        pp.pprint(optimizer)
 
     return optimizer
 

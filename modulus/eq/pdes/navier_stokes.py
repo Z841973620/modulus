@@ -29,6 +29,8 @@ class NavierStokes(PDE):
         Dimension of the Navier Stokes (2 or 3). Default is 3.
     time : bool
         If time-dependent equations or not. Default is True.
+    mixed_form: bool
+        If True, use the mixed formulation of the Navier-Stokes equations.
 
     Examples
     ========
@@ -46,10 +48,11 @@ class NavierStokes(PDE):
 
     name = "NavierStokes"
 
-    def __init__(self, nu, rho=1, dim=3, time=True):
+    def __init__(self, nu, rho=1, dim=3, time=True, mixed_form=False):
         # set params
         self.dim = dim
         self.time = time
+        self.mixed_form = mixed_form
 
         # coordinates
         x, y, z = Symbol("x"), Symbol("y"), Symbol("z")
@@ -90,62 +93,161 @@ class NavierStokes(PDE):
         # dynamic viscosity
         mu = rho * nu
 
-        # curl
-        curl = Number(0) if rho.diff() == 0 else u.diff(x) + v.diff(y) + w.diff(z)
-
         # set equations
         self.equations = {}
         self.equations["continuity"] = (
             rho.diff(t) + (rho * u).diff(x) + (rho * v).diff(y) + (rho * w).diff(z)
         )
-        self.equations["momentum_x"] = (
-            (rho * u).diff(t)
-            + (
-                u * ((rho * u).diff(x))
-                + v * ((rho * u).diff(y))
-                + w * ((rho * u).diff(z))
-                + rho * u * (curl)
-            )
-            + p.diff(x)
-            - (-2 / 3 * mu * (curl)).diff(x)
-            - (mu * u.diff(x)).diff(x)
-            - (mu * u.diff(y)).diff(y)
-            - (mu * u.diff(z)).diff(z)
-            - (mu * (curl).diff(x))
-        )
-        self.equations["momentum_y"] = (
-            (rho * v).diff(t)
-            + (
-                u * ((rho * v).diff(x))
-                + v * ((rho * v).diff(y))
-                + w * ((rho * v).diff(z))
-                + rho * v * (curl)
-            )
-            + p.diff(y)
-            - (-2 / 3 * mu * (curl)).diff(y)
-            - (mu * v.diff(x)).diff(x)
-            - (mu * v.diff(y)).diff(y)
-            - (mu * v.diff(z)).diff(z)
-            - (mu * (curl).diff(y))
-        )
-        self.equations["momentum_z"] = (
-            (rho * w).diff(t)
-            + (
-                u * ((rho * w).diff(x))
-                + v * ((rho * w).diff(y))
-                + w * ((rho * w).diff(z))
-                + rho * w * (curl)
-            )
-            + p.diff(z)
-            - (-2 / 3 * mu * (curl)).diff(z)
-            - (mu * w.diff(x)).diff(x)
-            - (mu * w.diff(y)).diff(y)
-            - (mu * w.diff(z)).diff(z)
-            - (mu * (curl).diff(z))
-        )
 
-        if self.dim == 2:
-            self.equations.pop("momentum_z")
+        if not self.mixed_form:
+            curl = Number(0) if rho.diff(x) == 0 else u.diff(x) + v.diff(y) + w.diff(z)
+            self.equations["momentum_x"] = (
+                (rho * u).diff(t)
+                + (
+                    u * ((rho * u).diff(x))
+                    + v * ((rho * u).diff(y))
+                    + w * ((rho * u).diff(z))
+                    + rho * u * (curl)
+                )
+                + p.diff(x)
+                - (-2 / 3 * mu * (curl)).diff(x)
+                - (mu * u.diff(x)).diff(x)
+                - (mu * u.diff(y)).diff(y)
+                - (mu * u.diff(z)).diff(z)
+                - (mu * (curl).diff(x))
+            )
+            self.equations["momentum_y"] = (
+                (rho * v).diff(t)
+                + (
+                    u * ((rho * v).diff(x))
+                    + v * ((rho * v).diff(y))
+                    + w * ((rho * v).diff(z))
+                    + rho * v * (curl)
+                )
+                + p.diff(y)
+                - (-2 / 3 * mu * (curl)).diff(y)
+                - (mu * v.diff(x)).diff(x)
+                - (mu * v.diff(y)).diff(y)
+                - (mu * v.diff(z)).diff(z)
+                - (mu * (curl).diff(y))
+            )
+            self.equations["momentum_z"] = (
+                (rho * w).diff(t)
+                + (
+                    u * ((rho * w).diff(x))
+                    + v * ((rho * w).diff(y))
+                    + w * ((rho * w).diff(z))
+                    + rho * w * (curl)
+                )
+                + p.diff(z)
+                - (-2 / 3 * mu * (curl)).diff(z)
+                - (mu * w.diff(x)).diff(x)
+                - (mu * w.diff(y)).diff(y)
+                - (mu * w.diff(z)).diff(z)
+                - (mu * (curl).diff(z))
+            )
+
+            if self.dim == 2:
+                self.equations.pop("momentum_z")
+
+        elif self.mixed_form:
+            u_x = Function("u_x")(*input_variables)
+            u_y = Function("u_y")(*input_variables)
+            u_z = Function("u_z")(*input_variables)
+            v_x = Function("v_x")(*input_variables)
+            v_y = Function("v_y")(*input_variables)
+            v_z = Function("v_z")(*input_variables)
+
+            if self.dim == 3:
+                w_x = Function("w_x")(*input_variables)
+                w_y = Function("w_y")(*input_variables)
+                w_z = Function("w_z")(*input_variables)
+            else:
+                w_x = Number(0)
+                w_y = Number(0)
+                w_z = Number(0)
+                u_z = Number(0)
+                v_z = Number(0)
+
+            curl = Number(0) if rho.diff(x) == 0 else u_x + v_y + w_z
+            self.equations["momentum_x"] = (
+                (rho * u).diff(t)
+                + (
+                    u * ((rho * u.diff(x)))
+                    + v * ((rho * u.diff(y)))
+                    + w * ((rho * u.diff(z)))
+                    + rho * u * (curl)
+                )
+                + p.diff(x)
+                - (-2 / 3 * mu * (curl)).diff(x)
+                - (mu * u_x).diff(x)
+                - (mu * u_y).diff(y)
+                - (mu * u_z).diff(z)
+                - (mu * (curl).diff(x))
+            )
+            self.equations["momentum_y"] = (
+                (rho * v).diff(t)
+                + (
+                    u * ((rho * v.diff(x)))
+                    + v * ((rho * v.diff(y)))
+                    + w * ((rho * v.diff(z)))
+                    + rho * v * (curl)
+                )
+                + p.diff(y)
+                - (-2 / 3 * mu * (curl)).diff(y)
+                - (mu * v_x).diff(x)
+                - (mu * v_y).diff(y)
+                - (mu * v_z).diff(z)
+                - (mu * (curl).diff(y))
+            )
+            self.equations["momentum_z"] = (
+                (rho * w).diff(t)
+                + (
+                    u * ((rho * w.diff(x)))
+                    + v * ((rho * w.diff(y)))
+                    + w * ((rho * w.diff(z)))
+                    + rho * w * (curl)
+                )
+                + p.diff(z)
+                - (-2 / 3 * mu * (curl)).diff(z)
+                - (mu * w_x).diff(x)
+                - (mu * w_y).diff(y)
+                - (mu * w_z).diff(z)
+                - (mu * (curl).diff(z))
+            )
+            self.equations["compatibility_u_x"] = u.diff(x) - u_x
+            self.equations["compatibility_u_y"] = u.diff(y) - u_y
+            self.equations["compatibility_u_z"] = u.diff(z) - u_z
+            self.equations["compatibility_v_x"] = v.diff(x) - v_x
+            self.equations["compatibility_v_y"] = v.diff(y) - v_y
+            self.equations["compatibility_v_z"] = v.diff(z) - v_z
+            self.equations["compatibility_w_x"] = w.diff(x) - w_x
+            self.equations["compatibility_w_y"] = w.diff(y) - w_y
+            self.equations["compatibility_w_z"] = w.diff(z) - w_z
+            self.equations["compatibility_u_xy"] = u_x.diff(y) - u_y.diff(x)
+            self.equations["compatibility_u_xz"] = u_x.diff(z) - u_z.diff(x)
+            self.equations["compatibility_u_yz"] = u_y.diff(z) - u_z.diff(y)
+            self.equations["compatibility_v_xy"] = v_x.diff(y) - v_y.diff(x)
+            self.equations["compatibility_v_xz"] = v_x.diff(z) - v_z.diff(x)
+            self.equations["compatibility_v_yz"] = v_y.diff(z) - v_z.diff(y)
+            self.equations["compatibility_w_xy"] = w_x.diff(y) - w_y.diff(x)
+            self.equations["compatibility_w_xz"] = w_x.diff(z) - w_z.diff(x)
+            self.equations["compatibility_w_yz"] = w_y.diff(z) - w_z.diff(y)
+
+            if self.dim == 2:
+                self.equations.pop("momentum_z")
+                self.equations.pop("compatibility_u_z")
+                self.equations.pop("compatibility_v_z")
+                self.equations.pop("compatibility_w_x")
+                self.equations.pop("compatibility_w_y")
+                self.equations.pop("compatibility_w_z")
+                self.equations.pop("compatibility_u_xz")
+                self.equations.pop("compatibility_u_yz")
+                self.equations.pop("compatibility_v_xz")
+                self.equations.pop("compatibility_v_yz")
+                self.equations.pop("compatibility_w_xy")
+                self.equations.pop("compatibility_w_xz")
+                self.equations.pop("compatibility_w_yz")
 
 
 class GradNormal(PDE):
@@ -262,3 +364,112 @@ class Curl(PDE):
         self.equations[curl_name[0]] = curl_0
         self.equations[curl_name[1]] = curl_1
         self.equations[curl_name[2]] = curl_2
+
+
+class CompressibleIntegralContinuity(PDE):
+    """
+    Compressible Integral Continuity
+
+    Parameters
+    ==========
+    rho : float, Sympy Symbol/Expr, str
+        The density of the fluid. If `rho` is a str then it is
+        converted to Sympy Function of form 'rho(x,y,z,t)'.
+        If 'rho' is a Sympy Symbol or Expression then this
+        is substituted into the equation to allow for
+        compressibility. Default is 1.
+    dim : int
+        Dimension of the equations (1, 2, or 3). Default is 3.
+    """
+
+    name = "CompressibleIntegralContinuity"
+
+    def __init__(self, rho=1, vec=["u", "v", "w"]):
+        # coordinates
+        x, y, z = Symbol("x"), Symbol("y"), Symbol("z")
+
+        # make input variables
+        input_variables = {"x": x, "y": y, "z": z}
+        self.dim = len(vec)
+        if self.dim == 1:
+            input_variables.pop("y")
+            input_variables.pop("z")
+        elif self.dim == 2:
+            input_variables.pop("z")
+
+        # normal
+        normal = [Symbol("normal_x"), Symbol("normal_y"), Symbol("normal_z")]
+
+        # density
+        if isinstance(rho, str):
+            rho = Function(rho)(*input_variables)
+        elif isinstance(rho, (float, int)):
+            rho = Number(rho)
+
+        # make input variables
+        self.equations = {}
+        self.equations["integral_continuity"] = 0
+        for v, n in zip(vec, normal):
+            self.equations["integral_continuity"] += Symbol(v) * n * rho
+
+
+class FluxContinuity(PDE):
+    """
+    Flux Continuity for arbitrary variable. Includes advective and diffusive flux
+
+    Parameters
+    ==========
+    T : str
+        The dependent variable.
+    rho : float, Sympy Symbol/Expr, str
+        The density of the fluid. If `rho` is a str then it is
+        converted to Sympy Function of form 'rho(x,y,z,t)'.
+        If 'rho' is a Sympy Symbol or Expression then this
+        is substituted into the equation to allow for
+        compressibility. Default is 1.
+    dim : int
+        Dimension of the equations (1, 2, or 3). Default is 3.
+    """
+
+    name = "FluxContinuity"
+
+    def __init__(self, T="T", D="D", rho=1, vec=["u", "v", "w"]):
+        # coordinates
+        x, y, z = Symbol("x"), Symbol("y"), Symbol("z")
+
+        # make input variables
+        input_variables = {"x": x, "y": y, "z": z}
+        self.dim = len(vec)
+        if self.dim == 1:
+            input_variables.pop("y")
+            input_variables.pop("z")
+        elif self.dim == 2:
+            input_variables.pop("z")
+
+        # normal
+        normal = [Symbol("normal_x"), Symbol("normal_y"), Symbol("normal_z")]
+
+        # density
+        if isinstance(rho, str):
+            rho = Function(rho)(*input_variables)
+        elif isinstance(rho, (float, int)):
+            rho = Number(rho)
+
+        # diffusion coefficient
+        if isinstance(D, str):
+            D = Function(D)(*input_variables)
+        elif isinstance(D, (float, int)):
+            D = Number(D)
+
+        # variables to set the flux (example Temperature)
+        T = Function(T)(*input_variables)
+
+        gradient = [T.diff(x), T.diff(y), T.diff(z)]
+
+        # make input variables
+        self.equations = {}
+        self.equations[str(T) + "_flux"] = 0
+        for v, n, g in zip(vec, normal, gradient):
+            self.equations[str(T) + "_flux"] += (
+                Symbol(v) * n * rho * T - rho * D * n * g
+            )

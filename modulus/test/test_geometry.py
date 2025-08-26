@@ -105,7 +105,7 @@ def test_primitives():
     g = Triangle((0, 0.5), 1, 1)
     check_geometry(
         g,
-        boundary_area=1.0 + 2 * np.sqrt(0.5 ** 2 + 1.0),
+        boundary_area=1.0 + 2 * np.sqrt(0.5**2 + 1.0),
         interior_area=0.5,
         max_sdf=0.30897,
     )
@@ -141,7 +141,7 @@ def test_primitives():
     # torus
     g = Torus((0, 1, 2), 2, 1)
     check_geometry(
-        g, boundary_area=8 * np.pi ** 2, interior_area=4 * np.pi ** 2, max_sdf=1
+        g, boundary_area=8 * np.pi**2, interior_area=4 * np.pi**2, max_sdf=1
     )
 
     """
@@ -180,8 +180,8 @@ def test_primitives():
     g = g.repeat(1.5, [-1, -1, -1], [3, 3, 3])
     check_geometry(
         g,
-        boundary_area=np.pi * 5 ** 3,
-        interior_area=(1.0 / 6.0) * np.pi * 5 ** 3,
+        boundary_area=np.pi * 5**3,
+        interior_area=(1.0 / 6.0) * np.pi * 5**3,
         max_sdf=0.5,
     )
 
@@ -212,11 +212,17 @@ def test_primitives():
 
     # test parameterization
     radius = Parameter("radius")
+    angle = Parameter("angle")
     g = Circle((0, 0, 0), radius, parameterization=Parameterization({radius: (1, 2)}))
     g = Rectangle((-2, -2, -2), (2, 2, 2)) - g
+    g = g.rotate(
+        angle=angle, parameterization=Parameterization({angle: (0, 2.0 * np.pi)})
+    )
     check_geometry(g, boundary_area=16 + 3 * np.pi)
     check_geometry(
-        g, boundary_area=16 + 2 * np.pi, parameterization=Parameterization({radius: 1})
+        g,
+        boundary_area=16 + 2 * np.pi,
+        parameterization=Parameterization({radius: 1, angle: np.pi}),
     )
 
 

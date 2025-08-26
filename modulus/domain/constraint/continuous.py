@@ -142,7 +142,6 @@ class PointwiseConstraint(Constraint):
         shuffle: bool = True,
         drop_last: bool = True,
         num_workers: int = 0,
-        jit_autograd_nodes: bool = True,
     ):
         """
         Create custom pointwise constraint from numpy arrays.
@@ -190,7 +189,6 @@ class PointwiseConstraint(Constraint):
             shuffle=shuffle,
             drop_last=drop_last,
             num_workers=num_workers,
-            jit_autograd_nodes=jit_autograd_nodes,
         )
 
 
@@ -264,7 +262,6 @@ class PointwiseBoundaryConstraint(PointwiseConstraint):
         quasirandom: bool = False,
         num_workers: int = 0,
         loss: Loss = PointwiseLossNorm(),
-        jit_autograd_nodes: bool = True,
         shuffle: bool = True,
     ):
 
@@ -343,7 +340,6 @@ class PointwiseBoundaryConstraint(PointwiseConstraint):
             shuffle=shuffle,
             drop_last=True,
             num_workers=num_workers,
-            jit_autograd_nodes=jit_autograd_nodes,
         )
 
 
@@ -420,7 +416,6 @@ class PointwiseInteriorConstraint(PointwiseConstraint):
         quasirandom: bool = False,
         num_workers: int = 0,
         loss: Loss = PointwiseLossNorm(),
-        jit_autograd_nodes: bool = True,
         shuffle: bool = True,
     ):
 
@@ -503,7 +498,6 @@ class PointwiseInteriorConstraint(PointwiseConstraint):
             shuffle=shuffle,
             drop_last=True,
             num_workers=num_workers,
-            jit_autograd_nodes=jit_autograd_nodes,
         )
 
 
@@ -672,7 +666,6 @@ class IntegralBoundaryConstraint(IntegralConstraint):
         quasirandom: bool = False,
         num_workers: int = 0,
         loss: Loss = IntegralLossNorm(),
-        jit_autograd_nodes: bool = True,
         shuffle: bool = True,
     ):
 
@@ -777,7 +770,6 @@ class IntegralBoundaryConstraint(IntegralConstraint):
             shuffle=shuffle,
             drop_last=True,
             num_workers=num_workers,
-            jit_autograd_nodes=jit_autograd_nodes,
         )
 
 
@@ -800,7 +792,6 @@ class VariationalConstraint(Constraint):
         shuffle: bool = True,
         drop_last: bool = True,
         num_workers: int = 0,
-        jit_autograd_nodes: bool = True,
     ):
 
         # Get DDP manager
@@ -832,7 +823,6 @@ class VariationalConstraint(Constraint):
             nodes,
             Key.convert_list(list(set(invar_keys))),
             Key.convert_list(list(set(outvar_keys))),
-            jit_autograd_nodes=jit_autograd_nodes,
         )
         self.manager = DistributedManager()
         self.device = self.manager.device
@@ -848,6 +838,9 @@ class VariationalConstraint(Constraint):
                     output_device=self.device,
                     broadcast_buffers=self.manager.broadcast_buffers,
                     find_unused_parameters=self.manager.find_unused_parameters,
+                    process_group=self.manager.group(
+                        "data_parallel"
+                    ),  # None by default
                 )
             torch.cuda.current_stream().wait_stream(s)
 
@@ -956,7 +949,6 @@ class VariationalDomainConstraint(VariationalConstraint):
         quasirandom: bool = False,
         num_workers: int = 0,
         loss: Loss = PointwiseLossNorm(),
-        jit_autograd_nodes: bool = True,
         shuffle: bool = True,
     ):
         # sample boundary
@@ -999,7 +991,6 @@ class VariationalDomainConstraint(VariationalConstraint):
             datasets=datasets,
             batch_sizes=batch_sizes,
             loss=loss,
-            jit_autograd_nodes=jit_autograd_nodes,
             shuffle=shuffle,
             drop_last=True,
             num_workers=num_workers,
@@ -1058,7 +1049,6 @@ class DeepONetConstraint(PointwiseConstraint):
         shuffle: bool = True,
         drop_last: bool = True,
         num_workers: int = 0,
-        jit_autograd_nodes: bool = True,
     ):
         """
         Create custom DeepONet constraint from numpy arrays.
@@ -1101,5 +1091,4 @@ class DeepONetConstraint(PointwiseConstraint):
             shuffle=shuffle,
             drop_last=drop_last,
             num_workers=num_workers,
-            jit_autograd_nodes=jit_autograd_nodes,
         )

@@ -5,8 +5,8 @@ import torch.nn as nn
 from torch import Tensor
 
 
-import modulus.models.layers.layers as layers
-from .arch import Arch
+import modulus.models.layers as layers
+from modulus.models.arch import Arch
 from modulus.key import Key
 
 
@@ -93,7 +93,43 @@ class DGMArch(Arch):
             activation_par=None,
         )
 
+    def _tensor_forward(self, x: Tensor) -> Tensor:
+        x = self.process_input(
+            x,
+            self.input_scales_tensor,
+            periodicity=self.periodicity,
+            input_dict=self.input_key_dict,
+            dim=-1,
+        )
+        s = self.fc_start(x)
+        for layer in self.dgm_layers:
+            # TODO: this can be optimized, 'z', 'g', 'r' can be merged into a
+            # single layer with 3x output size
+            z = layer["z"](x, s)
+            g = layer["g"](x, s)
+            r = layer["r"](x, s)
+            h = layer["h"](x, s * r)
+
+            s = h - g * h + z * s
+
+        x = self.fc_end(s)
+        x = self.process_output(x, self.output_scales_tensor)
+        return x
+
     def forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        x = self.concat_input(
+            in_vars,
+            self.input_key_dict.keys(),
+            detach_dict=self.detach_key_dict,
+            dim=-1,
+        )
+        y = self._tensor_forward(x)
+        return self.split_output(y, self.output_key_dict, dim=-1)
+
+    def _dict_forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        """
+        This is the original forward function, left here for the correctness test.
+        """
         x = self.prepare_input(
             in_vars,
             self.input_key_dict.keys(),

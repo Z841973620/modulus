@@ -12,6 +12,7 @@ from sympy import (
     Eq,
     Basic,
 )
+from typing import Dict, Tuple, List, Union
 
 from modulus.node import Node
 from modulus.constants import diff_str
@@ -56,12 +57,21 @@ class PDE(object):
         for name, eq in self.equations.items():
             self.equations[name] = eq.subs(x, y).doit()
 
-    def make_nodes(self, detach_names=[]):
+    def make_nodes(
+        self,
+        create_instances: int = 1,
+        freeze_terms: Dict[str, List[int]] = {},
+        detach_names: List[str] = [],
+    ):
         """
         Make a list of nodes from PDE.
 
         Parameters
         ----------
+        create_instances : int
+            This will create various instances of the same equations
+        freeze_terms : Dict[str, List[int]]
+            This will freeze the terms in appropiate equation
         detach_names : List[str]
             This will detach the inputs of the resulting node.
 
@@ -71,6 +81,45 @@ class PDE(object):
             Makes a separate node for every equation.
         """
         nodes = []
-        for name, eq in self.equations.items():
-            nodes.append(Node.from_sympy(eq, str(name), detach_names))
+        if create_instances == 1:
+            if bool(freeze_terms):
+                print(
+                    "Freezing of terms is not supported when create_instance = 1. No terms will be frozen!"
+                )
+                freeze_terms = {}  # override with an empty dict
+            for name, eq in self.equations.items():
+                nodes.append(Node.from_sympy(eq, str(name), freeze_terms, detach_names))
+        else:
+            # look for empty lists in freeze_terms dict
+            for k in list(freeze_terms):
+                if not freeze_terms[k]:
+                    freeze_terms.pop(k)
+            for i in range(create_instances):
+                for name, eq in self.equations.items():
+                    if str(name) + "_" + str(i) in freeze_terms.keys():
+                        nodes.append(
+                            Node.from_sympy(
+                                eq,
+                                str(name) + "_" + str(i),
+                                freeze_terms[str(name) + "_" + str(i)],
+                                detach_names,
+                            )
+                        )
+                    else:
+                        # set the freeze terms to an empty list
+                        print(
+                            "No freeze terms found for instance: "
+                            + str(name)
+                            + "_"
+                            + str(i)
+                            + ", setting to empty"
+                        )
+                        nodes.append(
+                            Node.from_sympy(
+                                eq,
+                                str(name) + "_" + str(i),
+                                [],
+                                detach_names,
+                            )
+                        )
         return nodes

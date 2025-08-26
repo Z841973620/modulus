@@ -129,7 +129,7 @@ class Quad_Disk(Quadrature):
             rr = np.swapaxes(rr, 0, -2)
             return rr + self.c
 
-        super().__init__(scheme=scheme_fcn(n), trans=my_trans, jac=np.pi * self.r ** 2)
+        super().__init__(scheme=scheme_fcn(n), trans=my_trans, jac=np.pi * self.r**2)
 
 
 class Quad_Rect(Quadrature):
@@ -169,7 +169,7 @@ class Quad_Sphere(Quadrature):
         super().__init__(
             scheme=scheme_fcn(n),
             trans=lambda x: x.T * self.r + self.c,
-            jac=4 * np.pi * self.r ** 2,
+            jac=4 * np.pi * self.r**2,
         )
 
 
@@ -188,7 +188,7 @@ class Quad_Ball(Quadrature):
             return rr + self.c
 
         super().__init__(
-            scheme=scheme_fcn(n), trans=my_trans, jac=4 / 3 * np.pi * self.r ** 3
+            scheme=scheme_fcn(n), trans=my_trans, jac=4 / 3 * np.pi * self.r**3
         )
 
 

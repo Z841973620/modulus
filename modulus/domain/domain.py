@@ -10,6 +10,7 @@ from modulus.domain.validator import Validator
 from modulus.domain.inferencer import Inferencer
 from modulus.domain.monitor import Monitor
 from modulus.loss.aggregator import NTK
+from modulus.models.arch import FuncArch
 
 
 class Domain:
@@ -37,8 +38,8 @@ class Domain:
 
     def rec_constraints(self, base_dir: str):
         constraint_data_dir = base_dir + "/constraints/"
-        if not os.path.exists(constraint_data_dir):
-            os.makedirs(constraint_data_dir)
+        # exist_ok=True to handle race conditions
+        os.makedirs(constraint_data_dir, exist_ok=True)
 
         for key, constraint in self.constraints.items():
             constraint.save_batch(constraint_data_dir + key)
@@ -48,20 +49,26 @@ class Domain:
     ):
         """Run and save results of validator nodes"""
         validator_data_dir = base_dir + "/validators/"
-        if not os.path.exists(validator_data_dir):
-            os.makedirs(validator_data_dir)
+        # exist_ok=True to handle race conditions
+        os.makedirs(validator_data_dir, exist_ok=True)
+
+        metrics = {}
         for key, validator in self.validators.items():
-            validator.save_results(
+            valid_losses = validator.save_results(
                 key, validator_data_dir, writer, save_filetypes, step
             )
+            # If validator returned add to metrics
+            if isinstance(valid_losses, dict):
+                metrics.update(valid_losses)
+        return metrics
 
     def rec_inferencers(
         self, base_dir: str, writer: SummaryWriter, save_filetypes: str, step: int
     ):
         """Run and save results of inferencer nodes"""
         inferencer_data_dir = base_dir + "/inferencers/"
-        if not os.path.exists(inferencer_data_dir):
-            os.makedirs(inferencer_data_dir)
+        # exist_ok=True to handle race conditions
+        os.makedirs(inferencer_data_dir, exist_ok=True)
 
         for key, inferencer in self.inferencers.items():
             inferencer.save_results(
@@ -80,8 +87,9 @@ class Domain:
     ):
         """Run and save results of stream"""
         inferencer_data_dir = base_dir + "/inferencers/"
-        if save_results and not os.path.exists(inferencer_data_dir):
-            os.makedirs(inferencer_data_dir)
+        if save_results:
+            # exist_ok=True to handle race conditions
+            os.makedirs(inferencer_data_dir, exist_ok=True)
 
         return inferencer.save_stream(
             name,
@@ -96,10 +104,12 @@ class Domain:
     def rec_monitors(self, base_dir: str, writer: SummaryWriter, step: int):
         """Run and save results of monitor nodes"""
         monitor_data_dir = base_dir + "/monitors/"
-        if not os.path.exists(monitor_data_dir):
-            os.makedirs(monitor_data_dir)
+        # exist_ok=True to handle race conditions
+        os.makedirs(monitor_data_dir, exist_ok=True)
+        metrics = {}
         for key, monitor in self.monitors.items():
-            monitor.save_results(key, writer, step, monitor_data_dir)
+            metrics.update(monitor.save_results(key, writer, step, monitor_data_dir))
+        return metrics
 
     def get_num_losses(self):
         return len(
@@ -145,6 +155,9 @@ class Domain:
             else:
                 model = c.model
             for m in model.evaluation_order:
+                # For FuncArch, we only need to save the wrapped Arch model
+                if isinstance(m, FuncArch):
+                    m = m.arch
                 if (m not in models) and m.saveable:
                     models.append(m)
         models = sorted(models, key=lambda x: x.name)
@@ -163,6 +176,8 @@ class Domain:
             else:
                 model = c.model
             for m in model.optimizer_list:
+                if isinstance(m, FuncArch):
+                    m = m.arch
                 if m not in models:
                     models.append(m)
         models = sorted(models, key=lambda x: x.name)

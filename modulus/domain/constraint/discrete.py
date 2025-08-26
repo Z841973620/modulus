@@ -1,6 +1,7 @@
-""" Continuous type contraints
+""" Continuous type constraints
 """
 
+import logging
 from typing import Dict, List, Union
 
 import torch
@@ -15,6 +16,8 @@ from modulus.loss import Loss, PointwiseLossNorm
 from modulus.distributed import DistributedManager
 from modulus.utils.io.vtk import grid_to_vtk
 from modulus.dataset import Dataset, IterableDataset, DictGridDataset
+
+logger = logging.getLogger(__name__)
 
 
 class SupervisedGridConstraint(Constraint):
@@ -83,21 +86,23 @@ class SupervisedGridConstraint(Constraint):
         pred_outvar = modl(invar)
 
         # rename values and save batch to vtk file TODO clean this up after graph unroll stuff
-        named_lambda_weighting = {
-            "lambda_" + key: value for key, value in lambda_weighting.items()
-        }
         named_true_outvar = {"true_" + key: value for key, value in true_outvar.items()}
         named_pred_outvar = {"pred_" + key: value for key, value in pred_outvar.items()}
         save_var = {
             **{key: value for key, value in invar0.items()},
             **named_true_outvar,
             **named_pred_outvar,
-            **named_lambda_weighting,
         }
         save_var = {
             key: value.cpu().detach().numpy() for key, value in save_var.items()
         }
-        grid_to_vtk(save_var, filename)
+
+        model_parallel_rank = (
+            self.manager.group_rank("model_parallel") if self.manager.distributed else 0
+        )
+
+        # Using - as delimiter here since vtk ignores anything after .
+        grid_to_vtk(save_var, filename + f"-{model_parallel_rank}")
 
     def load_data(self):
         # get train points from dataloader
@@ -211,6 +216,9 @@ class _DeepONetConstraint(Constraint):
                     output_device=self.device,
                     broadcast_buffers=self.manager.broadcast_buffers,
                     find_unused_parameters=self.manager.find_unused_parameters,
+                    process_group=self.manager.group(
+                        "data_parallel"
+                    ),  # None by default
                 )
             torch.cuda.current_stream().wait_stream(s)
 
@@ -257,7 +265,12 @@ class _DeepONetConstraint(Constraint):
         save_var = {
             key: value.cpu().detach().numpy() for key, value in save_var.items()
         }
-        np.savez_compressed(filename + ".npz", **save_var)
+
+        model_parallel_rank = (
+            self.manager.group_rank("model_parallel") if self.manager.distributed else 0
+        )
+
+        np.savez_compressed(filename + f".{model_parallel_rank}.npz", **save_var)
 
     def load_data(self):
         # get train points from dataloader

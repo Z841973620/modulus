@@ -232,7 +232,7 @@ def test_VariationalDomainConstraint():
 
     # define parabola node
     x, y = Symbol("x"), Symbol("y")
-    node = Node.from_sympy(x ** 2 + y ** 2, "u")
+    node = Node.from_sympy(x**2 + y**2, "u")
 
     # make geometry
     rec = Rectangle((-0.5, -0.5), (0.5, 0.5))

@@ -116,7 +116,7 @@ class Solver(Trainer):
         self.domain.rec_constraints(self.network_dir)
 
     def record_validators(self, step: int):
-        self.domain.rec_validators(
+        return self.domain.rec_validators(
             self.network_dir, self.writer, self.save_filetypes, step
         )
 
@@ -145,7 +145,7 @@ class Solver(Trainer):
         return bool(self.domain.inferencers)
 
     def record_monitors(self, step: int):
-        self.domain.rec_monitors(self.network_dir, self.writer, step)
+        return self.domain.rec_monitors(self.network_dir, self.writer, step)
 
     @property
     def has_monitors(self):

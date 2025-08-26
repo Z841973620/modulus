@@ -3,9 +3,9 @@ from torch import Tensor
 from typing import Dict, List, Tuple
 
 import modulus.models.fully_connected as fully_connected
-import modulus.models.layers.layers as layers
-from modulus.models.layers.layers import Activation
-from .arch import Arch
+import modulus.models.layers as layers
+from modulus.models.layers import Activation
+from modulus.models.arch import Arch
 from modulus.key import Key
 
 
@@ -118,9 +118,17 @@ class FourierNetArch(Arch):
             frequencies_params = frequencies
 
         self.xyzt_var = [x for x in self.input_key_dict if x in ["x", "y", "z", "t"]]
+        # Prepare slice index
+        xyzt_slice_index = self.prepare_slice_index(self.input_key_dict, self.xyzt_var)
+        self.register_buffer("xyzt_slice_index", xyzt_slice_index, persistent=False)
+
         self.params_var = [
             x for x in self.input_key_dict if x not in ["x", "y", "z", "t"]
         ]
+        params_slice_index = self.prepare_slice_index(
+            self.input_key_dict, self.params_var
+        )
+        self.register_buffer("params_slice_index", params_slice_index, persistent=False)
 
         in_features_xyzt = sum(
             (v for k, v in self.input_key_dict.items() if k in self.xyzt_var)
@@ -158,7 +166,38 @@ class FourierNetArch(Arch):
             weight_norm=weight_norm,
         )
 
+    def _tensor_forward(self, x: Tensor) -> Tensor:
+        x = self.process_input(
+            x, self.input_scales_tensor, input_dict=self.input_key_dict, dim=-1
+        )
+        if self.fourier_layer_xyzt is not None:
+            in_xyzt_var = self.slice_input(x, self.xyzt_slice_index, dim=-1)
+            fourier_xyzt = self.fourier_layer_xyzt(in_xyzt_var)
+            x = torch.cat((x, fourier_xyzt), dim=-1)
+
+        if self.fourier_layer_params is not None:
+            in_params_var = self.slice_input(x, self.params_slice_index, dim=-1)
+            fourier_params = self.fourier_layer_params(in_params_var)
+            x = torch.cat((x, fourier_params), dim=-1)
+
+        x = self.fc(x)
+        x = self.process_output(x, self.output_scales_tensor)
+        return x
+
     def forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        x = self.concat_input(
+            in_vars,
+            self.input_key_dict.keys(),
+            detach_dict=self.detach_key_dict,
+            dim=-1,
+        )
+        y = self._tensor_forward(x)
+        return self.split_output(y, self.output_key_dict, dim=-1)
+
+    def _dict_forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        """
+        This is the original forward function, left here for the correctness test.
+        """
         x = self.prepare_input(
             in_vars,
             self.input_key_dict.keys(),

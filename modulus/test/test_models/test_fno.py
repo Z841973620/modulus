@@ -3,30 +3,35 @@ import torch
 
 from modulus.key import Key
 from modulus.models.fno import FNOArch
+from modulus.models.fully_connected import FullyConnectedArch
 
 ########################
 # load & verify
 ########################
 def test_fno_1d():
     # Construct FNO model
+    decoder = FullyConnectedArch(
+        input_keys=[Key("z", size=32)],
+        output_keys=[Key("u", size=2), Key("p")],
+        nr_layers=1,
+        layer_size=8,
+    )
     model = FNOArch(
         input_keys=[Key("x", size=2)],
-        output_keys=[Key("u", size=2), Key("p")],
+        decoder_net=decoder,
         dimension=1,
         fno_modes=4,
         padding=0,
-        output_fc_layer_sizes=[8],
     )
     # Testing JIT
-    model.make_nodes(name="FNO1d", jit=True)
+    model.make_node(name="FNO1d", jit=True)
 
     bsize = 5
     invar = {
         "x": torch.randn(bsize, 2, 64),
     }
     # Model forward
-    latvar = model.encoder(invar)
-    outvar = model.decoder(latvar)
+    outvar = model(invar)
     # Check output size
     assert outvar["u"].shape == (bsize, 2, 64)
     assert outvar["p"].shape == (bsize, 1, 64)
@@ -34,16 +39,21 @@ def test_fno_1d():
 
 def test_fno_2d():
     # Construct FNO model
+    decoder = FullyConnectedArch(
+        input_keys=[Key("z", size=32)],
+        output_keys=[Key("u", size=2), Key("p")],
+        nr_layers=2,
+        layer_size=16,
+    )
     model = FNOArch(
         input_keys=[Key("x"), Key("y"), Key("rho", size=2)],
-        output_keys=[Key("u", size=2), Key("p")],
+        decoder_net=decoder,
         dimension=2,
         fno_modes=16,
-        output_fc_layer_sizes=[16, 32],
     )
 
     # Testing JIT
-    model.make_nodes(name="FNO2d", jit=True)
+    model.make_node(name="FNO2d", jit=True)
 
     bsize = 5
     invar = {
@@ -52,8 +62,7 @@ def test_fno_2d():
         "rho": torch.randn(bsize, 2, 32, 32),
     }
     # Model forward
-    latvar = model.encoder(invar)
-    outvar = model.decoder(latvar)
+    outvar = model(invar)
     # Check output size
     assert outvar["u"].shape == (bsize, 2, 32, 32)
     assert outvar["p"].shape == (bsize, 1, 32, 32)
@@ -61,16 +70,21 @@ def test_fno_2d():
 
 def test_fno_3d():
     # Construct FNO model
+    decoder = FullyConnectedArch(
+        input_keys=[Key("z", size=32)],
+        output_keys=[Key("u"), Key("v")],
+        nr_layers=1,
+        layer_size=8,
+    )
     model = FNOArch(
         input_keys=[Key("x", size=3), Key("y")],
-        output_keys=[Key("u"), Key("v")],
+        decoder_net=decoder,
         dimension=3,
         fno_modes=16,
-        output_fc_layer_sizes=[8],
     )
 
     # Testing JIT
-    model.make_nodes(name="FNO3d", jit=True)
+    model.make_node(name="FNO3d", jit=True)
 
     bsize = 5
     invar = {
@@ -78,8 +92,7 @@ def test_fno_3d():
         "y": torch.randn(bsize, 1, 32, 32, 32),
     }
     # Model forward
-    latvar = model.encoder(invar)
-    outvar = model.decoder(latvar)
+    outvar = model(invar)
     # Check output size
     assert outvar["u"].shape == (bsize, 1, 32, 32, 32)
     assert outvar["v"].shape == (bsize, 1, 32, 32, 32)

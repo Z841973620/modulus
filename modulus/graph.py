@@ -3,13 +3,17 @@
 
 from copy import copy
 import torch
-from typing import Dict, List
+import logging
+from typing import Dict, List, Optional
 
-
+from .models.arch import Arch, FuncArch
 from .node import Node
 from .key import Key
 from .constants import diff_str
 from .eq.derivatives import Derivative
+from .manager import JitManager, GraphManager
+
+logger = logging.getLogger(__name__)
 
 
 class Graph(torch.nn.Module):
@@ -42,6 +46,22 @@ class Graph(torch.nn.Module):
     diff_nodes : List[Node]
         List of specialty nodes to compute derivatives.
         By default this is not needed.
+    func_arch : bool, Optional
+        If True, find the computable derivatives that are part of the Jacobian and
+        Hessian of the neural network. They will be calculated during the forward
+        pass using FuncArch.
+        If None (default), will use the GraphManager to get the global flag
+        (default is False), which could be configured in the hydra config with key
+        `graph.func_arch`.
+    func_arch_allow_partial_hessian : bool, Optional
+        If True, allow evaluating partial hessian to save some unnecessary computations.
+        For example, when the input is x, outputs are [u, p], and the needed derivatives
+        are `[u__x, p__x, u__x__x]`, func_arch needs to evaluate the full hessian rows
+        to be able to extract jacobian `p__x`. When this flag is on, func_arch will
+        only output `[u__x, u__x__x]`, and `p__x` will be evaluated later by the autograd.
+        If None (default), will use the GraphManager to get the global flag
+        (default is True), which could be configured in the hydra config with key
+        `graph.func_arch_allow_partial_hessian`.
     """
 
     def __init__(
@@ -50,9 +70,19 @@ class Graph(torch.nn.Module):
         invar: List[Key],
         req_names: List[Key],
         diff_nodes: List[Node] = [],
-        jit_autograd_nodes: bool = True,
+        func_arch: Optional[bool] = None,
+        func_arch_allow_partial_hessian: Optional[bool] = None,
     ):
         super().__init__()
+
+        # get configs from the graph manager
+        graph_manager = GraphManager()
+        func_arch = func_arch if func_arch is not None else graph_manager.func_arch
+        func_arch_allow_partial_hessian = (
+            func_arch_allow_partial_hessian
+            if func_arch_allow_partial_hessian is not None
+            else graph_manager.func_arch_allow_partial_hessian
+        )
 
         self.req_names = req_names
         self.computable_names = set(_computable_names(nodes, invar))
@@ -90,6 +120,34 @@ class Graph(torch.nn.Module):
                     finished = False
             if finished:
                 break
+
+        # Convert arch node intto func_arch node if we find computable derivatives and the Arch
+        # instance has supports_func_arch == True
+        needed_names = set(needed_names)
+        if func_arch:
+            for i, node in enumerate(necessary_nodes):
+                # `jit_mode_arch` is forced to be `only_activation` when func_arch is enabled,
+                # so all Arch instances will not be `RecursiveScriptModules` and we are good
+                # to transform it into FuncArch
+                if isinstance(node.evaluate, Arch):
+                    if node.evaluate.supports_func_arch:
+                        computable_derivatives = (
+                            node.evaluate._find_computable_deriv_with_func_arch(
+                                needed_names, func_arch_allow_partial_hessian
+                            )
+                        )
+                        if len(computable_derivatives):
+                            node_name = necessary_nodes[i].name
+                            necessary_nodes[i] = FuncArch(
+                                node.evaluate, computable_derivatives
+                            ).make_node(node_name)
+                            logger.info(
+                                f"{node_name} has been converted to a FuncArch node."
+                            )
+                    else:
+                        logger.warning(
+                            f"Arch {type(node.evaluate)} currently does not support FuncArch"
+                        )
 
         # unroll graph with only necessary nodes
         # Store node evaluation order to use at runtime
@@ -132,7 +190,9 @@ class Graph(torch.nn.Module):
                 if try_auto_diff:
                     # Variables.differentiate(outvar, outvar, needed_derivatives)
                     dnode = Derivative.make_node(
-                        outvar, needed_derivatives, jit=jit_autograd_nodes
+                        outvar,
+                        needed_derivatives,
+                        jit=(JitManager().enabled and JitManager().autograd_nodes),
                     )
                     self.node_evaluation_order.append(dnode)
                     outvar += dnode.outputs
@@ -150,6 +210,9 @@ class Graph(torch.nn.Module):
             [n.evaluate for n in self.node_evaluation_order if n.optimize]
         )
 
+        if graph_manager.debug:
+            print(self)
+
     def forward(self, invar: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         outvar = invar
         for i, e in enumerate(self.evaluation_order):
@@ -160,6 +223,13 @@ class Graph(torch.nn.Module):
             key: value for key, value in outvar.items() if Key(key) in self.req_names
         }
         return outvar
+
+    def __str__(self):
+        repr = "=" * 100 + "\n"
+        for node in self.node_evaluation_order:
+            repr += "-" * 50 + "\n"
+            repr += str(node) + "\n"
+        return repr
 
 
 def _print_graph_unroll_error(nodes, invar, req_names):

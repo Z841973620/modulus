@@ -87,3 +87,4 @@ class PointwiseMonitor(Monitor):
                     )
                 }
             dict_to_csv(self.monitor_outvar_store[k], filename=data_dir + k + ".csv")
+        return metrics

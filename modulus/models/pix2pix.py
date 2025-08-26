@@ -59,9 +59,9 @@ from torch.autograd import Variable
 import numpy as np
 
 from modulus.key import Key
-import modulus.models.layers.layers as layers
-from .layers.layers import Activation
-from .arch import Arch
+import modulus.models.layers as layers
+from modulus.models.layers import Activation
+from modulus.models.arch import Arch
 
 Tensor = torch.Tensor
 
@@ -118,7 +118,7 @@ class Pix2PixModelCore(nn.Module):
 
         ### downsample
         for i in range(n_downsampling):
-            mult = 2 ** i
+            mult = 2**i
             model.append(
                 conv(
                     conv_layer_size * mult,
@@ -133,7 +133,7 @@ class Pix2PixModelCore(nn.Module):
             model.append(activation)
 
         ### resnet blocks
-        mult = 2 ** n_downsampling
+        mult = 2**n_downsampling
         for i in range(n_blocks):
             model += [
                 ResnetBlock(
@@ -341,6 +341,7 @@ class Pix2PixArch(Arch):
         )
         in_channels = sum(self.input_key_dict.values())
         out_channels = sum(self.output_key_dict.values())
+        self.var_dim = 1
 
         # Scaling factor must be 1, 2, 4, or 8
         scaling_factor = int(scaling_factor)

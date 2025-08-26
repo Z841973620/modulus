@@ -1,9 +1,10 @@
 """ Key
 """
 
+import re
+from typing import Union, List
 from functools import reduce
-
-from .constants import diff_str
+from .constants import diff_str, NO_OP_SCALE
 
 
 class Key(object):
@@ -27,7 +28,7 @@ class Key(object):
       Characteristic location and scale of quantity: used for normalisation.
     """
 
-    def __init__(self, name, size=1, derivatives=[], base_unit=None, scale=(0.0, 1.0)):
+    def __init__(self, name, size=1, derivatives=[], base_unit=None, scale=NO_OP_SCALE):
         super(Key, self).__init__()
         self.name = name
         self.size = size
@@ -68,6 +69,84 @@ class Key(object):
             keys.append(Key.convert(name_or_tuple))
         return keys
 
+    @staticmethod
+    def convert_config(key_cfg: Union[List, str]):
+        """Converts a config input/output key string/list into a key
+        This provides a quick alternative method for defining keys in models
+
+        Parameters
+        ----------
+        key_cfg : Union[List, str]
+            Config list or string
+
+        Returns
+        -------
+        List[Key]
+            List of keys generated
+
+        Example
+        -------
+        The following are some config examples for constructing keys in the YAML file.
+
+        Defining input/output keys with size of 1
+
+        >>> arch:
+        >>>    full_connected:
+        >>>        input_keys: input
+        >>>        output_keys: output
+
+        Defining input/output keys with different sizes
+
+        >>> arch:
+        >>>    full_connected:
+        >>>        input_keys: [input, 2] # Key('input',size=2)
+        >>>        output_keys: [output, 3] # Key('output',size=3)
+
+        Multiple input/output keys with size of 1
+        >>> arch:
+        >>>    full_connected:
+        >>>        input_keys: [a, b, c]
+        >>>        output_keys: [u, w, v]
+
+        Multiple input/output keys with different sizes
+        >>> arch:
+        >>>    full_connected:
+        >>>        input_keys: [[a,2], [b,3]] # Key('a',size=2), Key('b',size=3)
+        >>>        output_keys: [[u,3],w] # Key('u',size=3), Key('w',size=1)
+
+        """
+        # Just single key name
+        if isinstance(key_cfg, str):
+            # Clean white space
+            kstr = re.sub("^\s+", "", key_cfg)
+            keys = [Key.convert(kstr)]
+        # Mutliple keys
+        elif isinstance(key_cfg, list):
+            keys = []
+            for cfg_obj in key_cfg:
+                if isinstance(cfg_obj, str):
+                    key = Key.convert(cfg_obj)
+                    keys.append(key)
+                elif isinstance(cfg_obj, int) and len(keys) > 0:
+                    keys[-1].size = cfg_obj
+                elif isinstance(cfg_obj, list):
+                    key_name = cfg_obj[0]
+                    key = Key.convert(key_name)
+                    try:
+                        key_size = int(cfg_obj[1])
+                        key.size = key_size
+                    except:
+                        key.size = 1
+                    keys.append(key)
+                # Manually provided
+                elif isinstance(cfg_obj, Key):
+                    keys.append(cfg_obj)
+                else:
+                    raise ValueError(f"Invalid key parameter set in config {key_cfg}")
+        else:
+            raise ValueError(f"Invalid key parameter set in config {key_cfg}")
+        return keys
+
     @property
     def unit(self):
         return self.base_unit / reduce(
@@ -83,6 +162,14 @@ class Key(object):
 
     def __eq__(self, obj):
         return isinstance(obj, Key) and str(self) == str(obj)
+
+    def __lt__(self, obj):
+        assert isinstance(obj, Key)
+        return str(self) < str(obj)
+
+    def __gt__(self, obj):
+        assert isinstance(obj, Key)
+        return str(self) > str(obj)
 
     def __hash__(self):
         return hash(str(self))

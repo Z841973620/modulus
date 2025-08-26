@@ -60,15 +60,23 @@ class MaxwellFreqReal(PDE):
       converted to Sympy Function of form 'k(x,y,z,t)'.
       If 'k' is a Sympy Symbol or Expression then this
       is substituted into the equation.
+    mixed_form: bool
+        If True, use the mixed formulation of the diffusion equations.
     """
 
     name = "MaxwellFreqReal"
 
-    def __init__(self, ux="ux", uy="uy", uz="uz", k=1.0):
+    def __init__(self, ux="ux", uy="uy", uz="uz", k=1.0, mixed_form=False):
         # set params
         self.ux = ux
         self.uy = uy
         self.uz = uz
+        self.mixed_form = mixed_form
+
+        if self.mixed_form:
+            raise NotImplementedError(
+                "Maxwell's equation is not implemented in mixed form"
+            )
 
         # coordinates
         x, y, z = Symbol("x"), Symbol("y"), Symbol("z")
@@ -95,9 +103,9 @@ class MaxwellFreqReal(PDE):
 
         # set equations
         self.equations = {}
-        self.equations["Maxwell_Freq_real_x"] = c2ux - k ** 2 * ux
-        self.equations["Maxwell_Freq_real_y"] = c2uy - k ** 2 * uy
-        self.equations["Maxwell_Freq_real_z"] = c2uz - k ** 2 * uz
+        self.equations["Maxwell_Freq_real_x"] = c2ux - k**2 * ux
+        self.equations["Maxwell_Freq_real_y"] = c2uy - k**2 * uy
+        self.equations["Maxwell_Freq_real_z"] = c2uz - k**2 * uz
 
 
 class SommerfeldBC(PDE):

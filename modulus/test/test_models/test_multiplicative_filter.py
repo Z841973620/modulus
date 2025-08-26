@@ -1,7 +1,12 @@
-from modulus.models.multiplicative_filter_net import MultiplicativeFilterNetArch
+from modulus.models.multiplicative_filter_net import (
+    MultiplicativeFilterNetArch,
+    FilterType,
+)
 import torch
 import numpy as np
 from modulus.key import Key
+import pytest
+from .model_test_utils import validate_func_arch_net
 
 
 def make_dict(nr_layers):
@@ -54,6 +59,30 @@ def test_multiplicative_filter():
     # verify
     assert np.allclose(data_out1, data_out2, atol=1e-4), "Test failed!"
     print("Success!")
+
+
+@pytest.mark.parametrize(
+    "input_keys", [[Key("x"), Key("y")], [Key("x"), Key("y", scale=(1.0, 2.0))]]
+)
+@pytest.mark.parametrize("validate_with_dict_forward", [True, False])
+@pytest.mark.parametrize("normalization", [None, {"x": (-2.5, 2.5), "y": (-2.5, 2.5)}])
+@pytest.mark.parametrize("filter_type", [FilterType.FOURIER, FilterType.GABOR])
+def test_func_arch_multiplicative_filter(
+    input_keys, validate_with_dict_forward, normalization, filter_type
+):
+    deriv_keys = [
+        Key.from_str("u__x"),
+        Key.from_str("u__x__x"),
+        Key.from_str("v__y"),
+        Key.from_str("v__y__y"),
+    ]
+    ref_net = MultiplicativeFilterNetArch(
+        input_keys=input_keys,
+        output_keys=[Key("u"), Key("v")],
+        normalization=normalization,
+        filter_type=filter_type,
+    )
+    validate_func_arch_net(ref_net, deriv_keys, validate_with_dict_forward)
 
 
 if __name__ == "__main__":

@@ -32,14 +32,14 @@ def test_zero_equation():
 
     mixing_length = np.minimum(0.419 * normal_distance, 0.09 * max_distance)
     G = (
-        2 * u__x ** 2
-        + 2 * v__y ** 2
-        + 2 * w__z ** 2
+        2 * u__x**2
+        + 2 * v__y**2
+        + 2 * w__z**2
         + (u__y + v__x) ** 2
         + (u__z + w__x) ** 2
         + (v__z + w__y) ** 2
     )
-    nu_true = nu + rho * mixing_length ** 2 * np.sqrt(G)
+    nu_true = nu + rho * mixing_length**2 * np.sqrt(G)
 
     zero_eq = ZeroEquation(nu=nu, max_distance=max_distance, rho=rho, dim=3, time=True)
     evaluations_zero_eq = zero_eq.make_nodes()[0].evaluate(

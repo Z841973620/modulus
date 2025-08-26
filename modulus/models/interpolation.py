@@ -30,12 +30,12 @@ def linear_step(x: Tensor) -> Tensor:
 
 @torch.jit.script
 def smooth_step_1(x: Tensor) -> Tensor:
-    return torch.clip(3 * x ** 2 - 2 * x ** 3, 0, 1)
+    return torch.clip(3 * x**2 - 2 * x**3, 0, 1)
 
 
 @torch.jit.script
 def smooth_step_2(x: Tensor) -> Tensor:
-    return torch.clip(x ** 3 * (6 * x ** 2 - 15 * x + 10), 0, 1)
+    return torch.clip(x**3 * (6 * x**2 - 15 * x + 10), 0, 1)
 
 
 @torch.jit.script
@@ -205,7 +205,7 @@ def _grid_knn_idx(
         idx_row_1 = center_idx[..., 1:2] + idx_add
         idx_row_1 = idx_row_1.unsqueeze(2)
         idx = (idx_row_0 + idx_row_1).view(
-            idx_row_0.shape[0:2] + torch.Size([int(stride ** 2)])
+            idx_row_0.shape[0:2] + torch.Size([int(stride**2)])
         )
     elif len(grid) == 3:
         dim_size_1 = grid[1][2]
@@ -220,7 +220,7 @@ def _grid_knn_idx(
         idx_row_2 = center_idx[..., 2:3] + idx_add
         idx_row_2 = idx_row_2.unsqueeze(2).unsqueeze(3)
         idx = (idx_row_0 + idx_row_1 + idx_row_2).view(
-            idx_row_0.shape[0:2] + torch.Size([int(stride ** 3)])
+            idx_row_0.shape[0:2] + torch.Size([int(stride**3)])
         )
     else:
         raise RuntimeError

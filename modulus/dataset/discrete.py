@@ -7,8 +7,8 @@ from typing import Union, Dict, List
 import numpy as np
 import h5py
 
-from modulus.utils.io.vtk import var_to_polyvtk
-from .dataset import Dataset, _DictDatasetMixin
+from modulus.utils.io.vtk import grid_to_vtk
+from modulus.dataset.dataset import Dataset, _DictDatasetMixin
 
 
 class _DictGridDatasetMixin(_DictDatasetMixin):

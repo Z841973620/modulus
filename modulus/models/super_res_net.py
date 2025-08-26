@@ -33,8 +33,8 @@ import math
 from typing import List, Dict
 
 from modulus.key import Key
-from .arch import Arch
-from .layers.layers import Activation, get_activation_fn
+from modulus.models.arch import Arch
+from modulus.models.layers import Activation, get_activation_fn
 
 Tensor = torch.Tensor
 
@@ -91,7 +91,7 @@ class PixelShuffle3d(nn.Module):
 
     def forward(self, input: Tensor) -> Tensor:
         batch_size, channels, in_depth, in_height, in_width = input.size()
-        nOut = int(channels // self.scale ** 3)
+        nOut = int(channels // self.scale**3)
 
         out_depth = in_depth * self.scale
         out_height = in_height * self.scale
@@ -123,7 +123,7 @@ class SubPixelConvolutionalBlock3d(nn.Module):
         # A convolutional layer that increases the number of channels by scaling factor^2, followed by pixel shuffle and PReLU
         self.conv = nn.Conv3d(
             in_channels=conv_layer_size,
-            out_channels=conv_layer_size * (scaling_factor ** 3),
+            out_channels=conv_layer_size * (scaling_factor**3),
             kernel_size=kernel_size,
             padding=kernel_size // 2,
         )
@@ -229,6 +229,7 @@ class SRResNetArch(Arch):
         )
         in_channels = sum(self.input_key_dict.values())
         out_channels = sum(self.output_key_dict.values())
+        self.var_dim = 1
 
         # Scaling factor must be 2, 4, or 8
         scaling_factor = int(scaling_factor)

@@ -21,5 +21,11 @@ np_dt = np.float32
 TF_SUMMARY = False
 
 # Pytorch Version for which JIT will be default on
-# Torch version of NGC container 22.05
-JIT_PYTORCH_VERSION = "1.12.0a0+8a1a93a"
+# Torch version of NGC container 22.08
+JIT_PYTORCH_VERSION = "1.13.0a0+d321be6"
+
+# No scaling is needed if using NO_OP_SCALE
+NO_OP_SCALE = (0.0, 1.0)
+
+# If using NO_OP_NORM, it is effectively doing no normalization
+NO_OP_NORM = (-1.0, 1.0)

@@ -116,7 +116,7 @@ class Curve:
           this criteria.
         approx_nr : int
           Area might be difficult to compute if parameterized. In
-          this case the area is approximated by sampleing `area`,
+          this case the area is approximated by sampling `area`,
           `approx_nr` number of times. This amounts to monte carlo
           integration.
 

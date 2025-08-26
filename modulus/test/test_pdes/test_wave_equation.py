@@ -52,7 +52,7 @@ def test_helmholtz_equation():
     u__y__y = -np.sin(x) * np.sin(y) * np.sin(z)
     u__z__z = -np.sin(x) * np.sin(y) * np.sin(z)
 
-    helmholtz_equation_true = -(k ** 2 * u + u__x__x + u__y__y + u__z__z)
+    helmholtz_equation_true = -(k**2 * u + u__x__x + u__y__y + u__z__z)
 
     # evaluate the equation
     eq = HelmholtzEquation(u="u", k=k, dim=3)

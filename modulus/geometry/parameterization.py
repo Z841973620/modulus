@@ -1,6 +1,6 @@
 import itertools
 import numpy as np
-from typing import Dict, List, Union, Tuple, Callable
+from typing import Dict, List, Union, Tuple, Callable, Optional
 import sympy
 from typing import Callable
 from chaospy.distributions.sampler.sequences.primes import create_primes
@@ -97,6 +97,62 @@ class Parameterization:
 
     def __str__(self):
         return str(self.param_ranges)
+
+
+class OrderedParameterization(Parameterization):
+    """A object used to store ordered parameterization information
+    about user-specified keys.
+
+    Parameters
+    ----------
+    param_ranges : Dict[Parameter, Union[float, Tuple[float, float], np.ndarray (N, 1)]
+        Dictionary of Parameters and their ranges. The ranges can be one of the following
+        types,
+        :obj: Float will sample the parameter equal to this value.
+        :obj: Tuple of two float as the bounding range to sample parameter from.
+        :obj: `np.ndarray` as a discrete list of possible values for the parameter.
+    """
+
+    def __init__(self, param_ranges, key):
+        super().__init__(param_ranges)
+        self.key = key
+
+    def sample(
+        self, nr_points: int, quasirandom: bool = False, sort: Optional = "ascending"
+    ):
+        """Sample ordered parameterization values.
+
+        Parameters
+        ----------
+        nr_points : int
+            Number of points sampled from parameterization.
+        quasirandom : bool
+            If true then sample the points using Halton sequences.
+            Default is False.
+        sort : None or {'ascending','descending'}
+            If 'ascending' then sample the sorted points in ascending order.
+            If 'descending' then sample the sorted points in descending order.
+            Default is 'ascending'.
+        """
+
+        sample_dict = {}
+        for key, value in _sample_ranges(
+            nr_points, self.param_ranges, quasirandom
+        ).items():
+            # sort the samples for the given key
+            if key == self.key:
+                if sort == "ascending":
+                    value = np.sort(value, axis=0)
+                elif sort == "descending":
+                    value = np.sort(value, axis=0)[::-1]
+                else:
+                    raise ValueError(
+                        "Sort must be one of None, 'ascending', or 'descending' (got {})".format(
+                            str(sort)
+                        )
+                    )
+            sample_dict[str(key)] = value
+        return sample_dict
 
 
 class Bounds:

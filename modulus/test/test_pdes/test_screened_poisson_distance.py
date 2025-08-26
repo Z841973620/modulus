@@ -20,7 +20,7 @@ def test_screened_poisson_distance_equation():
 
     tau = 0.1
 
-    sdf_grad = 1 - distance__x ** 2 - distance__y ** 2 - distance__z ** 2
+    sdf_grad = 1 - distance__x**2 - distance__y**2 - distance__z**2
     poisson = np.sqrt(tau) * (distance__x__x + distance__y__y + distance__z__z)
     screened_poisson_distance_true = sdf_grad + poisson
 

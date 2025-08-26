@@ -160,6 +160,7 @@ class PointwiseValidator(Validator):
                 writer.add_scalar(
                     "Validators/" + name + "/" + k, loss, step, new_style=True
                 )
+        return losses
 
 
 class PointVTKValidator(PointwiseValidator):
@@ -315,3 +316,4 @@ class PointVTKValidator(PointwiseValidator):
                 writer.add_scalar(
                     "Validators/" + name + "/" + k, loss, step, new_style=True
                 )
+        return losses

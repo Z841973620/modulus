@@ -6,8 +6,8 @@ import torch.nn as nn
 from torch import Tensor
 
 
-import modulus.models.layers.layers as layers
-from .arch import Arch
+import modulus.models.layers as layers
+from modulus.models.arch import Arch
 from modulus.key import Key
 
 
@@ -62,13 +62,41 @@ class RadialBasisArch(Arch):
             activation_fn=layers.Activation.IDENTITY,
         )
 
+    def _tensor_forward(self, x: Tensor) -> Tensor:
+        # no op since no scales
+        x = self.process_input(x, input_dict=self.input_key_dict, dim=-1)
+        x = x.unsqueeze(-2)
+        # no need to unsqueeze(0), we could and we have to rely on broadcast to
+        # make BatchedTensor work
+        centers = self.centers
+
+        radial_activation = torch.exp(
+            -0.5 * torch.square(torch.norm(centers - x, p=2, dim=-1) / self.sigma)
+        )
+        x = self.fc_layer(radial_activation)
+        x = self.process_output(x)  # no op
+        return x
+
     def forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        x = self.concat_input(
+            in_vars,
+            self.input_key_dict.keys(),
+            detach_dict=self.detach_key_dict,
+            dim=-1,
+        )
+        y = self._tensor_forward(x)
+        return self.split_output(y, self.output_key_dict, dim=-1)
+
+    def _dict_forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        """
+        This is the original forward function, left here for the correctness test.
+        """
         x = self.prepare_input(
             in_vars, self.input_key_dict.keys(), self.detach_key_dict, -1
         )
         shape = (x.size(0), self.nr_centers, x.size(1))
         x = x.unsqueeze(1).expand(shape)
-        centers = self.centers.unsqueeze(0).expand(shape)
+        centers = self.centers.expand(shape)
 
         radial_activation = torch.exp(
             -0.5 * torch.square(torch.norm(centers - x, p=2, dim=-1) / self.sigma)

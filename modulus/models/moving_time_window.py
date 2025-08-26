@@ -6,9 +6,9 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-import modulus.models.layers.layers as layers
+import modulus.models.layers as layers
 from .interpolation import smooth_step_1, smooth_step_2
-from .arch import Arch
+from modulus.models.arch import Arch
 
 from typing import List
 
@@ -53,13 +53,15 @@ class MovingTimeWindowArch(Arch):
         self.reset_parameters()
 
     def forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        in_vars["t"] += self.window_location
+        with torch.no_grad():
+            in_vars["t"] += self.window_location
         y_prev_step = self.arch_prev_step.forward(in_vars)
         y = self.arch.forward(in_vars)
-        for (key, b) in y_prev_step.items():
-            y[key + "_prev_step"] = b
-        for (key, a), (_, b) in zip(y.items(), y_prev_step.items()):
-            y[key + "_prev_step_diff"] = a - b
+        y_keys = list(y.keys())
+        for key in y_keys:
+            y_prev = y_prev_step[key]
+            y[key + "_prev_step"] = y_prev
+            y[key + "_prev_step_diff"] = y[key] - y_prev
         return y
 
     def move_window(self):

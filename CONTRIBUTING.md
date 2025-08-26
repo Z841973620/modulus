@@ -48,13 +48,13 @@ The following are the container images (and tag format) that are released:
 NVIDIA is willing to work with partners for extending and adding functionality to the Modulus platform. Modulus and its components are licensed under the [Modulus EULA license](/LICENSE.txt).
 
 To get started developing with the Modulus code base we suggest mounting it as a volume inside the current docker container.
-E.g. for version `22.07` we suggest the following:
+E.g. for version `22.09` we suggest the following:
 
 ```shell
 $ mkdir modulus_dev && cd modulus_dev
 $ git clone https://gitlab.com/nvidia/Modulus/Modulus.git
 $ docker run --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 \
-           --runtime nvidia -v ${PWD}:/examples/ -it modulus:22.07 bash
+           --runtime nvidia -v ${PWD}:/examples/ -it modulus:22.09 bash
 $ cd modulus
 $ python setup.py develop
 $ cd ..

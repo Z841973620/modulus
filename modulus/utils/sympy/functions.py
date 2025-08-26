@@ -53,7 +53,7 @@ def parabola(x, inter_1, inter_2, height):
       `y=factor*(x-inter_1)*(x-+inter_2)`
     """
 
-    factor = (4 * height) / (-(inter_1 ** 2) - inter_2 ** 2 + 2 * inter_1 * inter_2)
+    factor = (4 * height) / (-(inter_1**2) - inter_2**2 + 2 * inter_1 * inter_2)
     return factor * (x - inter_1) * (x - inter_2)
 
 

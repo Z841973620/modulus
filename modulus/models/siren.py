@@ -1,12 +1,13 @@
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Union
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 
-import modulus.models.layers.layers as layers
-from .arch import Arch
+import modulus.models.layers as layers
+from modulus.models.arch import Arch
 from modulus.key import Key
+from modulus.constants import NO_OP_NORM
 
 
 class SirenArch(Arch):
@@ -101,8 +102,40 @@ class SirenArch(Arch):
 
         self.layers = nn.Sequential(*layers_list)
         self.normalization: Optional[Dict[str, Tuple[float, float]]] = normalization
+        # iterate input keys and add NO_OP_NORM if it is not specified
+        if self.normalization is not None:
+            for key in self.input_key_dict:
+                if key not in self.normalization:
+                    self.normalization[key] = NO_OP_NORM
+        self.register_buffer(
+            "normalization_tensor",
+            self._get_normalization_tensor(self.input_key_dict, self.normalization),
+            persistent=False,
+        )
+
+    def _tensor_forward(self, x: Tensor) -> Tensor:
+        x = self._tensor_normalize(x, self.normalization_tensor)
+        x = self.process_input(
+            x, self.input_scales_tensor, input_dict=self.input_key_dict, dim=-1
+        )
+        x = self.layers(x)
+        x = self.process_output(x, self.output_scales_tensor)
+        return x
 
     def forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        x = self.concat_input(
+            in_vars,
+            self.input_key_dict.keys(),
+            detach_dict=self.detach_key_dict,
+            dim=-1,
+        )
+        y = self._tensor_forward(x)
+        return self.split_output(y, self.output_key_dict, dim=-1)
+
+    def _dict_forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        """
+        This is the original forward function, left here for the correctness test.
+        """
         x = self.prepare_input(
             self._normalize(in_vars, self.normalization),
             self.input_key_dict.keys(),

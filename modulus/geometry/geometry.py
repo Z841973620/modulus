@@ -202,7 +202,7 @@ class Geometry:
         self,
         angle: Union[float, sympy.Basic],
         axis: str = "z",
-        center: Union[None, List[Union[float]]] = None,
+        center: Union[None, List[float]] = None,
         parameterization=Parameterization(),
     ):
         """
@@ -227,7 +227,9 @@ class Geometry:
             elif isinstance(angle, sympy.Basic):
                 angle = _sympy_func_to_func(angle)
             else:
-                raise TypeError("Scaling by type " + str(type(x)) + "is not supported")
+                raise TypeError(
+                    "Scaling by type " + str(type(angle)) + "is not supported"
+                )
 
             def rotate_sdf(invar, params, compute_sdf_derivatives=False):
                 # compute translation if needed
@@ -244,12 +246,12 @@ class Geometry:
                 _rotated_invar = {**rotated_invar}
                 rotated_dims = [key for key in dims if key != axis]
                 _rotated_invar[rotated_dims[0]] = (
-                    np.cos(angle) * rotated_invar[rotated_dims[0]]
-                    + np.sin(angle) * rotated_invar[rotated_dims[1]]
+                    np.cos(computed_angle) * rotated_invar[rotated_dims[0]]
+                    + np.sin(computed_angle) * rotated_invar[rotated_dims[1]]
                 )
                 _rotated_invar[rotated_dims[1]] = (
-                    -np.sin(angle) * rotated_invar[rotated_dims[0]]
-                    + np.cos(angle) * rotated_invar[rotated_dims[1]]
+                    -np.sin(computed_angle) * rotated_invar[rotated_dims[0]]
+                    + np.cos(computed_angle) * rotated_invar[rotated_dims[1]]
                 )
                 if center is not None:
                     for i, key in enumerate(dims):
@@ -300,7 +302,7 @@ class Geometry:
         spacing: float,
         repeat_lower: List[int],
         repeat_higher: List[int],
-        center: Union[None, List[Union[float]]] = None,
+        center: Union[None, List[float]] = None,
     ):
         """
         Finite Repetition of geometry.

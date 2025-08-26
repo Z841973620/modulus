@@ -2,6 +2,8 @@ from modulus.models.modified_fourier_net import ModifiedFourierNetArch
 import torch
 import numpy as np
 from modulus.key import Key
+import pytest
+from .model_test_utils import validate_func_arch_net
 
 
 def make_dict(nr_layers):
@@ -59,6 +61,24 @@ def test_modified_fourier_net():
     # verify
     assert np.allclose(data_out1, data_out2, rtol=1e-3), "Test failed!"
     print("Success!")
+
+
+@pytest.mark.parametrize(
+    "input_keys", [[Key("x"), Key("y")], [Key("x"), Key("y", scale=(1.0, 2.0))]]
+)
+@pytest.mark.parametrize("validate_with_dict_forward", [True, False])
+def test_func_arch_modified_fourier_net(input_keys, validate_with_dict_forward):
+    deriv_keys = [
+        Key.from_str("u__x"),
+        Key.from_str("u__x__x"),
+        Key.from_str("v__y"),
+        Key.from_str("v__y__y"),
+    ]
+    ref_net = ModifiedFourierNetArch(
+        input_keys=input_keys,
+        output_keys=[Key("u"), Key("v")],
+    )
+    validate_func_arch_net(ref_net, deriv_keys, validate_with_dict_forward)
 
 
 test_modified_fourier_net()

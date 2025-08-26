@@ -5,15 +5,10 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-import modulus.models.layers.layers as layers
-from modulus.models.layers.layers import Activation
-from .arch import Arch
+from modulus.models.layers import Activation, FCLayer, Conv1dFCLayer
+from modulus.models.arch import Arch
 
 from typing import List
-
-
-def str2bool(x: str) -> bool:
-    return x.lower() in "true"
 
 
 class FullyConnectedArchCore(nn.Module):
@@ -27,10 +22,18 @@ class FullyConnectedArchCore(nn.Module):
         activation_fn: Activation = Activation.SILU,
         adaptive_activations: bool = False,
         weight_norm: bool = True,
+        conv_layers: bool = False,
     ) -> None:
         super().__init__()
 
         self.skip_connections = skip_connections
+
+        # Allows for regular linear layers to be swapped for 1D Convs
+        # Useful for channel operations in FNO/Transformers
+        if conv_layers:
+            fc_layer = Conv1dFCLayer
+        else:
+            fc_layer = FCLayer
 
         if adaptive_activations:
             activation_par = nn.Parameter(torch.ones(1))
@@ -49,7 +52,7 @@ class FullyConnectedArchCore(nn.Module):
         layer_in_features = in_features
         for i in range(nr_layers):
             self.layers.append(
-                layers.FCLayer(
+                fc_layer(
                     layer_in_features,
                     layer_size,
                     activation_fn[i],
@@ -59,10 +62,10 @@ class FullyConnectedArchCore(nn.Module):
             )
             layer_in_features = layer_size
 
-        self.final_layer = layers.FCLayer(
+        self.final_layer = fc_layer(
             in_features=layer_size,
             out_features=out_features,
-            activation_fn=layers.Activation.IDENTITY,
+            activation_fn=Activation.IDENTITY,
             weight_norm=False,
             activation_par=None,
         )
@@ -79,6 +82,15 @@ class FullyConnectedArchCore(nn.Module):
 
         x = self.final_layer(x)
         return x
+
+    def get_weight_list(self):
+        weights = [layer.conv.weight for layer in self.layers] + [
+            self.final_layer.conv.weight
+        ]
+        biases = [layer.conv.bias for layer in self.layers] + [
+            self.final_layer.conv.bias
+        ]
+        return weights, biases
 
 
 class FullyConnectedArch(Arch):
@@ -146,7 +158,7 @@ class FullyConnectedArch(Arch):
         detach_keys: List[Key] = [],
         layer_size: int = 512,
         nr_layers: int = 6,
-        activation_fn=layers.Activation.SILU,
+        activation_fn=Activation.SILU,
         periodicity: Union[Dict[str, Tuple[float, float]], None] = None,
         skip_connections: bool = False,
         adaptive_activations: bool = False,
@@ -188,7 +200,32 @@ class FullyConnectedArch(Arch):
             weight_norm,
         )
 
+    def _tensor_forward(self, x: Tensor) -> Tensor:
+        x = self.process_input(
+            x,
+            self.input_scales_tensor,
+            periodicity=self.periodicity,
+            input_dict=self.input_key_dict,
+            dim=-1,
+        )
+        x = self._impl(x)
+        x = self.process_output(x, self.output_scales_tensor)
+        return x
+
     def forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        x = self.concat_input(
+            in_vars,
+            self.input_key_dict.keys(),
+            detach_dict=self.detach_key_dict,
+            dim=-1,
+        )
+        y = self._tensor_forward(x)
+        return self.split_output(y, self.output_key_dict, dim=-1)
+
+    def _dict_forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        """
+        This is the original forward function, left here for the correctness test.
+        """
         x = self.prepare_input(
             in_vars,
             self.input_key_dict.keys(),
@@ -200,4 +237,58 @@ class FullyConnectedArch(Arch):
         y = self._impl(x)
         return self.prepare_output(
             y, self.output_key_dict, dim=-1, output_scales=self.output_scales
+        )
+
+
+class ConvFullyConnectedArch(Arch):
+    def __init__(
+        self,
+        input_keys: List[Key],
+        output_keys: List[Key],
+        detach_keys: List[Key] = [],
+        layer_size: int = 512,
+        nr_layers: int = 6,
+        activation_fn=Activation.SILU,
+        skip_connections: bool = False,
+        adaptive_activations: bool = False,
+    ) -> None:
+        super().__init__(
+            input_keys=input_keys,
+            output_keys=output_keys,
+            detach_keys=detach_keys,
+        )
+        self.var_dim = 1
+        in_features = sum(self.input_key_dict.values())
+        out_features = sum(self.output_key_dict.values())
+
+        self._impl = FullyConnectedArchCore(
+            in_features,
+            layer_size,
+            out_features,
+            nr_layers,
+            skip_connections,
+            activation_fn,
+            adaptive_activations,
+            weight_norm=False,
+            conv_layers=True,
+        )
+
+    def forward(self, in_vars: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        x = self.prepare_input(
+            in_vars,
+            self.input_key_dict.keys(),
+            detach_dict=self.detach_key_dict,
+            dim=1,
+            input_scales=self.input_scales,
+            periodicity=self.periodicity,
+        )
+        x_shape = list(x.size())
+        x = x.view(x.shape[0], x.shape[1], -1)
+        y = self._impl(x)
+
+        x_shape[1] = y.shape[1]
+        y = y.view(x_shape)
+
+        return self.prepare_output(
+            y, self.output_key_dict, dim=1, output_scales=self.output_scales
         )

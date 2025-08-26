@@ -21,7 +21,7 @@ def test_SupervisedGridConstraint():
     x, y = np.meshgrid(np.linspace(0, 1, 10), np.linspace(0, 1, 10))
 
     # define targets
-    u = x ** 2 + y ** 2
+    u = x**2 + y**2
 
     # make dataset
     dataset = DictGridDataset(
@@ -53,7 +53,7 @@ def test_DeepONetConstraints():
     x, y = np.meshgrid(np.linspace(0, 1, 10), np.linspace(0, 1, 10))
 
     # define targets
-    u = x ** 2 + y ** 2
+    u = x**2 + y**2
 
     # make dataset
     invar_branch = {"x": x[np.newaxis, :]}
@@ -79,7 +79,7 @@ def test_DeepONetConstraints():
     class Parabola(torch.nn.Module):
         def forward(self, invar):
             x, y = invar["x"], invar["y"]
-            u = x ** 2 + y ** 2
+            u = x**2 + y**2
             u = u.reshape((-1, 1))  # reshape output
             return {"u": u}
 

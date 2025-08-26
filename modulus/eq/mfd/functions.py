@@ -47,8 +47,8 @@ class SecondDerivO2_f(Function):
     # [1.0, -2.0, 1.0]
     @staticmethod
     def forward(ctx, tensor0, tensor1, tensor2, dx):
-        ctx.c0 = 1.0 / (dx ** 2)
-        ctx.c1 = -2.0 / (dx ** 2)
+        ctx.c0 = 1.0 / (dx**2)
+        ctx.c1 = -2.0 / (dx**2)
         return ctx.c0 * tensor0 + ctx.c1 * tensor1 + ctx.c0 * tensor2
 
     @staticmethod
@@ -65,9 +65,9 @@ class SecondDerivO4_f(Function):
     # [-1/12, 4/3, -5/2, 4/3, -1/12]
     @staticmethod
     def forward(ctx, tensor0, tensor1, tensor2, tensor3, tensor4, dx):
-        ctx.c0 = -1.0 / (12.0 * dx ** 2)
-        ctx.c1 = 4.0 / (3.0 * dx ** 2)
-        ctx.c2 = -5.0 / (2.0 * dx ** 2)
+        ctx.c0 = -1.0 / (12.0 * dx**2)
+        ctx.c1 = 4.0 / (3.0 * dx**2)
+        ctx.c2 = -5.0 / (2.0 * dx**2)
         return (
             ctx.c0 * tensor0
             + ctx.c1 * tensor1
@@ -92,8 +92,8 @@ class MixedSecondDerivO2_f(Function):
     # Ref: https://onlinelibrary.wiley.com/doi/pdf/10.1002/9781119083405.app1
     @staticmethod
     def forward(ctx, tensor0, tensor1, tensor2, tensor3, dx):
-        ctx.c0 = 0.25 / (dx ** 2)
-        ctx.c1 = -0.25 / (dx ** 2)
+        ctx.c0 = 0.25 / (dx**2)
+        ctx.c1 = -0.25 / (dx**2)
         return ctx.c0 * tensor0 + ctx.c1 * tensor1 + ctx.c1 * tensor2 + ctx.c0 * tensor3
 
     @staticmethod
@@ -111,10 +111,10 @@ class ThirdDerivO2_f(Function):
     # [1/2, -1.0, 1.0, -1/2]
     @staticmethod
     def forward(ctx, tensor0, tensor1, tensor2, tensor3, dx):
-        ctx.c0 = 0.5 / (dx ** 3)
-        ctx.c1 = -1.0 / (dx ** 3)
-        ctx.c2 = 1.0 / (dx ** 3)
-        ctx.c3 = -0.5 / (dx ** 3)
+        ctx.c0 = 0.5 / (dx**3)
+        ctx.c1 = -1.0 / (dx**3)
+        ctx.c2 = 1.0 / (dx**3)
+        ctx.c3 = -0.5 / (dx**3)
         return ctx.c0 * tensor0 + ctx.c1 * tensor1 + ctx.c2 * tensor2 + ctx.c3 * tensor3
 
     @staticmethod
@@ -132,11 +132,11 @@ class ForthDerivO2_f(Function):
     # [1.0, -4.0, 6.0, -4.0, 1.0]
     @staticmethod
     def forward(ctx, tensor0, tensor1, tensor2, tensor3, tensor4, dx):
-        ctx.c0 = 1.0 / (dx ** 4)
-        ctx.c1 = -4.0 / (dx ** 4)
-        ctx.c2 = 6.0 / (dx ** 4)
-        ctx.c3 = -4.0 / (dx ** 4)
-        ctx.c4 = 1.0 / (dx ** 4)
+        ctx.c0 = 1.0 / (dx**4)
+        ctx.c1 = -4.0 / (dx**4)
+        ctx.c2 = 6.0 / (dx**4)
+        ctx.c3 = -4.0 / (dx**4)
+        ctx.c4 = 1.0 / (dx**4)
         return (
             ctx.c0 * tensor0
             + ctx.c1 * tensor1

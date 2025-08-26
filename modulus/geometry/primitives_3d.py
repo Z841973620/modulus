@@ -717,7 +717,7 @@ class Sphere(Geometry):
         curve_parameterization = Parameterization.combine(
             curve_parameterization, parameterization
         )
-        norm = sqrt(r_1 ** 2 + r_2 ** 2 + r_3 ** 2)
+        norm = sqrt(r_1**2 + r_2**2 + r_3**2)
         curve_1 = SympyCurve(
             functions={
                 "x": center[0] + radius * r_1 / norm,  # TODO GAUSSIAN DIST
@@ -728,7 +728,7 @@ class Sphere(Geometry):
                 "normal_z": r_3 / norm,
             },
             parameterization=curve_parameterization,
-            area=4 * pi * radius ** 2,
+            area=4 * pi * radius**2,
         )
         curves = [curve_1]
 
@@ -809,7 +809,7 @@ class Cylinder(Geometry):
                 "normal_z": 1,
             },
             parameterization=curve_parameterization,
-            area=pi * radius ** 2,
+            area=pi * radius**2,
         )
         curve_3 = SympyCurve(
             functions={
@@ -821,7 +821,7 @@ class Cylinder(Geometry):
                 "normal_z": -1,
             },
             parameterization=curve_parameterization,
-            area=pi * radius ** 2,
+            area=pi * radius**2,
         )
         curves = [curve_1, curve_2, curve_3]
 
@@ -1006,7 +1006,7 @@ class Cone(Geometry):
                 "normal_z": 1 * sin(cone_angle),
             },
             parameterization=curve_parameterization,
-            area=pi * radius * (sqrt(height ** 2 + radius ** 2)),
+            area=pi * radius * (sqrt(height**2 + radius**2)),
         )
         curve_2 = SympyCurve(
             functions={
@@ -1018,7 +1018,7 @@ class Cone(Geometry):
                 "normal_z": -1,
             },
             parameterization=curve_parameterization,
-            area=pi * radius ** 2,
+            area=pi * radius**2,
         )
         curves = [curve_1, curve_2]
 
@@ -1503,11 +1503,11 @@ class IsoTriangularPrism(Geometry):
 
         norm = ((HB_p).cross(HB)).normalize()
         norm_HB = (norm.cross(HB)).normalize()
-        hypo = sqrt(height ** 2 + (base / 2) ** 2)
+        hypo = sqrt(height**2 + (base / 2) ** 2)
         angle = acos(PH.dot(OH) / sqrt(PH.dot(PH)) / sqrt(OH.dot(OH)))
         apex_angle = asin(base / 2 / hypo)
-        hypo_sin = sqrt(height ** 2 + (base / 2) ** 2) * sin(apex_angle)
-        hypo_cos = sqrt(height ** 2 + (base / 2) ** 2) * cos(apex_angle)
+        hypo_sin = sqrt(height**2 + (base / 2) ** 2) * sin(apex_angle)
+        hypo_cos = sqrt(height**2 + (base / 2) ** 2) * cos(apex_angle)
         dist = sqrt(PH.dot(PH)) * sin(Min(angle - apex_angle, pi / 2))
 
         a = (center[0] - base / 2) * N.i + center[1] * N.j + center[2] * N.k
@@ -1543,7 +1543,7 @@ class IsoTriangularPrism(Geometry):
                 "normal_z": 0,
             },
             parameterization=curve_parameterization,
-            area=sqrt(height ** 2 + (base / 2) ** 2) * height_prism,
+            area=sqrt(height**2 + (base / 2) ** 2) * height_prism,
         )
         curve_3 = SympyCurve(
             functions={
@@ -1555,7 +1555,7 @@ class IsoTriangularPrism(Geometry):
                 "normal_z": 0,
             },
             parameterization=curve_parameterization,
-            area=sqrt(height ** 2 + (base / 2) ** 2) * height_prism,
+            area=sqrt(height**2 + (base / 2) ** 2) * height_prism,
         )
         curve_4 = SympyCurve(
             functions={
@@ -1689,7 +1689,7 @@ class ElliCylinder(Geometry):
         r_1, r_2 = Symbol(csg_curve_naming(1)), Symbol(csg_curve_naming(2))
         angle = Symbol(csg_curve_naming(3))
 
-        phi = asin(b / sqrt(a ** 2 + b ** 2))
+        phi = asin(b / sqrt(a**2 + b**2))
         # phi = atan2(b, a)
         theta = pi / 2 - phi
 
@@ -1761,7 +1761,7 @@ class ElliCylinder(Geometry):
                 "normal_z": 1,
             },
             parameterization=curve_parameterization,
-            area=theta * r1 ** 2,
+            area=theta * r1**2,
         )
         curve_6 = SympyCurve(
             functions={
@@ -1773,7 +1773,7 @@ class ElliCylinder(Geometry):
                 "normal_z": 1,
             },
             parameterization=curve_parameterization,
-            area=phi * r2 ** 2 - 0.5 * (r2 - b) * (a - r1) * 2,
+            area=phi * r2**2 - 0.5 * (r2 - b) * (a - r1) * 2,
             criteria=center[1] - r2 + b + sqrt(r_2) * r2 * sin(pi / 2 + angle * phi)
             > center[1],
         )
@@ -1788,7 +1788,7 @@ class ElliCylinder(Geometry):
                 "normal_z": 1,
             },
             parameterization=curve_parameterization,
-            area=theta * r1 ** 2,
+            area=theta * r1**2,
         )
         curve_8 = SympyCurve(
             functions={
@@ -1803,7 +1803,7 @@ class ElliCylinder(Geometry):
                 "normal_z": 1,
             },
             parameterization=curve_parameterization,
-            area=phi * r2 ** 2 - 0.5 * (r2 - b) * (a - r1) * 2,
+            area=phi * r2**2 - 0.5 * (r2 - b) * (a - r1) * 2,
             criteria=center[1] + r2 - b + sqrt(r_2) * r2 * sin(3 * pi / 2 + angle * phi)
             < center[1],
         )
@@ -1819,7 +1819,7 @@ class ElliCylinder(Geometry):
                 "normal_z": -1,
             },
             parameterization=curve_parameterization,
-            area=theta * r1 ** 2,
+            area=theta * r1**2,
         )
         curve_10 = SympyCurve(
             functions={
@@ -1831,7 +1831,7 @@ class ElliCylinder(Geometry):
                 "normal_z": -1,
             },
             parameterization=curve_parameterization,
-            area=phi * r2 ** 2 - 0.5 * (r2 - b) * (a - r1) * 2,
+            area=phi * r2**2 - 0.5 * (r2 - b) * (a - r1) * 2,
             criteria=center[1] - r2 + b + sqrt(r_2) * r2 * sin(pi / 2 + angle * phi)
             > center[1],
         )
@@ -1846,7 +1846,7 @@ class ElliCylinder(Geometry):
                 "normal_z": -1,
             },
             parameterization=curve_parameterization,
-            area=theta * r1 ** 2,
+            area=theta * r1**2,
         )
         curve_12 = SympyCurve(
             functions={
@@ -1861,7 +1861,7 @@ class ElliCylinder(Geometry):
                 "normal_z": -1,
             },
             parameterization=curve_parameterization,
-            area=phi * r2 ** 2 - 0.5 * (r2 - b) * (a - r1) * 2,
+            area=phi * r2**2 - 0.5 * (r2 - b) * (a - r1) * 2,
             criteria=center[1] + r2 - b + sqrt(r_2) * r2 * sin(3 * pi / 2 + angle * phi)
             < center[1],
         )
@@ -1934,7 +1934,7 @@ class ElliCylinder(Geometry):
         flat_outside_distance = Max(Abs(z - center[2]) - 0.5 * height, 0)
 
         outside_distance = sqrt(
-            curved_outside_distance ** 2 + flat_outside_distance ** 2
+            curved_outside_distance**2 + flat_outside_distance**2
         )
 
         # (sign((x-min)*(max-x))+1)/2       # gives 0 if outside range, 0.5 if on min/max, 1 if inside range

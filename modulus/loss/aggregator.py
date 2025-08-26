@@ -168,6 +168,78 @@ class GradNorm(Aggregator):
         return loss
 
 
+class ResNorm(Aggregator):
+
+    """
+    Residual normalization for loss aggregation
+    Contributors: T. Nandi, D. Van Essendelft, M. A. Nabian
+    """
+
+    def __init__(self, params, num_losses, alpha=1.0, weights=None):
+        super().__init__(params, num_losses, weights)
+        self.alpha: float = alpha
+        self.lmbda: torch.nn.Parameter = nn.Parameter(
+            torch.zeros(num_losses, device=self.device)
+        )
+        self.register_buffer(
+            "init_losses", torch.zeros(self.num_losses, device=self.device)
+        )
+
+    def forward(self, losses: Dict[str, torch.Tensor], step: int) -> torch.Tensor:
+        """
+        Weights and aggregates the losses using the ResNorm algorithm
+
+        Parameters
+        ----------
+        losses : Dict[str, torch.Tensor]
+            A dictionary of losses.
+        step : int
+            Optimizer step.
+
+        Returns
+        -------
+        loss : torch.Tensor
+            Aggregated loss.
+        """
+
+        # weigh losses
+        losses = self.weigh_losses(losses, self.weights)
+
+        # get initial losses
+        if step == 0:
+            for i, key in enumerate(losses.keys()):
+                self.init_losses[i] = losses[key].clone().detach()
+
+        with torch.no_grad():
+            normalizer: torch.Tensor = self.num_losses / (torch.exp(self.lmbda).sum())
+            for i in range(self.num_losses):
+                self.lmbda[i] = self.lmbda[i].clone() + torch.log(
+                    normalizer.detach()
+                )  # c*exp(x) = exp(log(c)+x)
+        lmbda_exp: torch.Tensor = torch.exp(self.lmbda)
+
+        # compute relative losses, inverse rate, and grad coefficient
+        losses_stacked: torch.Tensor = torch.stack(list(losses.values()))
+        with torch.no_grad():
+            relative_losses: torch.Tensor = torch.div(losses_stacked, self.init_losses)
+            inverse_rate: torch.Tensor = relative_losses / (relative_losses.mean())
+            resnorm_coef: torch.Tensor = torch.pow(inverse_rate, self.alpha)
+
+        # compute residual norm and average residual norm
+        residuals: torch.Tensor = torch.zeros_like(self.init_losses)
+        for i, key in enumerate(losses.keys()):
+            residuals[i] = lmbda_exp[i] * losses[key].detach()
+        avg_residuals: torch.Tensor = losses_stacked.detach().mean()
+
+        # compute ResNorm & model losses
+        loss_resnorm: torch.Tensor = torch.abs(
+            residuals - avg_residuals * resnorm_coef
+        ).sum()
+        loss_model: torch.Tensor = (lmbda_exp.detach() * losses_stacked).sum()
+        loss: torch.Tensor = loss_resnorm + loss_model
+        return loss
+
+
 class HomoscedasticUncertainty(Aggregator):
     """
     Homoscedastic task uncertainty for loss aggregation

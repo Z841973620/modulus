@@ -7,7 +7,7 @@ from torch import Tensor
 
 import logging
 
-import modulus.models.layers.layers as layers
+import modulus.models.layers as layers
 from modulus.models.arch import Arch
 
 from typing import List

@@ -49,7 +49,7 @@ def _sympy_sdf_to_sdf(sdf, dx=0.0001):
                             computed_sdf_plus - computed_sdf_minus
                         ) / dx
                     else:
-                        # Fill deriv with zeros for compatability
+                        # Fill deriv with zeros for compatibility
                         outputs["sdf" + diff_str + d] = np.zeros_like(computed_sdf)
 
             return outputs

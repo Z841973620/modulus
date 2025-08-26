@@ -1,6 +1,6 @@
 """ Modulus nodes
 """
-
+from sympy import Add
 import torch
 from .constants import diff_str
 from .key import Key
@@ -44,7 +44,7 @@ class Node:
             ), "Optimizable nodes require model to have unique name"
 
     @classmethod
-    def from_sympy(cls, eq, out_name, detach_names=[]):
+    def from_sympy(cls, eq, out_name, freeze_terms=[], detach_names=[]):
         """
         generates a Modulus Node from a SymPy equation
 
@@ -58,6 +58,8 @@ class Node:
           to a node whose input is [`f,f__x,k`].
         out_name : str
           This will be the name of the output for the node.
+        freeze_terms : List[int]
+          The terms that need to be frozen
         detach_names : List[str]
           This will detach the inputs of the resulting node.
 
@@ -76,7 +78,19 @@ class Node:
         sub_eq = _subs_derivatives(eq)
 
         # construct Modulus node
-        evaluate = SympyToTorch(sub_eq, out_name, detach_names)
+        if bool(freeze_terms):
+            print(
+                "the terms "
+                + str(freeze_terms)
+                + " will be frozen in the equation "
+                + str(out_name)
+                + ": "
+                + str(Add.make_args(sub_eq))
+            )
+            print("Verify before proceeding!")
+        else:
+            pass
+        evaluate = SympyToTorch(sub_eq, out_name, freeze_terms, detach_names)
         inputs = Key.convert_list(evaluate.keys)
         outputs = Key.convert_list([out_name])
         node = cls(inputs, outputs, evaluate, name="Sympy Node: " + out_name)
@@ -127,6 +141,9 @@ class Node:
         return (
             "node: "
             + self.name
+            + "\n"
+            + "evaluate: "
+            + str(self.evaluate.__class__.__name__)
             + "\n"
             + "inputs: "
             + str(self.inputs)
